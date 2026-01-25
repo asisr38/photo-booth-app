@@ -15,6 +15,10 @@ type PendingCapturePreview = {
 };
 
 type CameraPreviewProps = {
+  activeSlotIndex: number;
+  slotCount: number;
+  slotsFilled: number;
+  isCaptureComplete: boolean;
   countdownSeconds: CountdownSeconds;
   onCountdownChange: (seconds: CountdownSeconds) => void;
   mirrorPreview: boolean;
@@ -36,6 +40,10 @@ const labelForCountdown = (value: CountdownSeconds): string =>
   value === 0 ? "Off" : `${value}s`;
 
 export const CameraPreview = ({
+  activeSlotIndex,
+  slotCount,
+  slotsFilled,
+  isCaptureComplete,
   countdownSeconds,
   onCountdownChange,
   mirrorPreview,
@@ -192,6 +200,9 @@ export const CameraPreview = ({
   const isInsecure = cameraState === "insecure";
   const isRequesting = cameraState === "requesting";
   const isPending = Boolean(pendingCapture);
+  const isCountingDown = countdownRemaining !== null;
+  const isBusy = isCapturing || isCountingDown;
+  const hudShotIndex = pendingCapture ? pendingCapture.slotIndex : activeSlotIndex;
   const fallbackMessage = isInsecure
     ? "Camera needs HTTPS or localhost."
     : isDenied
@@ -226,6 +237,14 @@ export const CameraPreview = ({
             )}
           </div>
         )}
+        <div className={`camera-hud ${isPending ? "is-pending" : ""}`}>
+          <div className="camera-hud-badge">
+            {pendingCapture ? `Review shot ${hudShotIndex + 1}` : `Shot ${hudShotIndex + 1} of ${slotCount}`}
+          </div>
+          <div className="camera-hud-subtle">
+            {isCaptureComplete ? "All shots captured" : `${slotsFilled}/${slotCount} captured`}
+          </div>
+        </div>
         {pendingCapture && (
           <div className="camera-confirm-overlay" role="dialog" aria-live="assertive">
             <img src={pendingCapture.dataUrl} alt={`Preview for slot ${pendingCapture.slotIndex + 1}`} />
@@ -261,6 +280,7 @@ export const CameraPreview = ({
                   className={`countdown-chip ${countdownSeconds === option ? "is-active" : ""}`}
                   onClick={() => onCountdownChange(option)}
                   aria-pressed={countdownSeconds === option}
+                  disabled={isPending || isBusy}
                 >
                   {labelForCountdown(option)}
                 </button>
@@ -271,16 +291,22 @@ export const CameraPreview = ({
                 type="checkbox"
                 checked={mirrorPreview}
                 onChange={(event) => onMirrorChange(event.target.checked)}
+                disabled={isPending || isBusy}
               />
               <span>Mirror preview</span>
             </label>
           </div>
 
           <div className="controls">
-            <button type="button" className="btn ghost" onClick={handleFlip}>
+            <button type="button" className="btn ghost" onClick={handleFlip} disabled={!isLive || isBusy}>
               Flip Camera
             </button>
-            <button type="button" className="btn primary" onClick={handleCapture} disabled={!isLive}>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={handleCapture}
+              disabled={!isLive || isBusy}
+            >
               {isCapturing ? "Capturing..." : "Capture"}
             </button>
           </div>

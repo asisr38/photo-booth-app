@@ -78,6 +78,12 @@ export const CaptureStep = ({
   const handleSelectSlot = (slotIndex: number) => {
     setActiveSlotIndex(slotIndex);
     setPendingCapture(null);
+    const hasShot = shotsBySlot.has(slotIndex);
+    if (hasShot) {
+      onStatusChange(`Slot ${slotIndex + 1} selected. Capture to replace it.`);
+      return;
+    }
+    onStatusChange(`Slot ${slotIndex + 1} ready. Hit capture when you're set.`);
   };
 
   const handleRetakeSlot = (slotIndex: number) => {
@@ -91,7 +97,7 @@ export const CaptureStep = ({
 
   const handleCaptured = (payload: CapturePayload) => {
     setPendingCapture({ slotIndex: activeSlotSafe, payload });
-    onStatusChange(`Review slot ${activeSlotSafe + 1}.`);
+    onStatusChange(`Nice. Review slot ${activeSlotSafe + 1}.`);
   };
 
   const handleConfirmCapture = () => {
@@ -112,7 +118,9 @@ export const CaptureStep = ({
 
     const nextSlot = findNextEmptySlot(layout, filledSlots);
     setActiveSlotIndex(nextSlot);
-    onStatusChange(`Slot ${pendingCapture.slotIndex + 1} saved. Keep going.`);
+    onStatusChange(
+      `Slot ${pendingCapture.slotIndex + 1} saved. Next up: slot ${nextSlot + 1}.`
+    );
   };
 
   const handleRetakePending = () => {
@@ -131,12 +139,17 @@ export const CaptureStep = ({
     onStatusChange("All slots cleared. Start again.");
   };
 
-  const isNextEnabled = slotsFilled >= layout.slotCount && !pendingCapture;
+  const isCaptureComplete = slotsFilled >= layout.slotCount && !pendingCapture;
+  const stepClassName = `step step-capture ${isCaptureComplete ? "has-sticky-actions" : ""}`;
 
   return (
-    <div className="step step-capture" role="tabpanel" aria-labelledby="step-capture">
+    <div className={stepClassName} role="tabpanel" aria-labelledby="step-capture">
       <div className="step-grid">
         <CameraPreview
+          activeSlotIndex={activeSlotSafe}
+          slotCount={layout.slotCount}
+          slotsFilled={slotsFilled}
+          isCaptureComplete={isCaptureComplete}
           countdownSeconds={countdownSeconds}
           onCountdownChange={onCountdownChange}
           mirrorPreview={mirrorPreview}
@@ -163,25 +176,28 @@ export const CaptureStep = ({
           onRetakeSlot={handleRetakeSlot}
           onRetakeAll={handleRetakeAll}
           slotsFilled={slotsFilled}
+          onBack={onBack}
         />
       </div>
 
-      <div className="panel step-actions">
-        <div className="step-actions-meta">
-          <strong>{layout.name}</strong>
-          <span>
-            {slotsFilled}/{layout.slotCount} shots captured
-          </span>
+      {isCaptureComplete ? (
+        <div className="panel step-actions">
+          <div className="step-actions-meta">
+            <strong>{layout.name}</strong>
+            <span>
+              {slotsFilled}/{layout.slotCount} shots captured
+            </span>
+          </div>
+          <div className="step-actions-buttons">
+            <button type="button" className="btn ghost" onClick={onBack}>
+              Back
+            </button>
+            <button type="button" className="btn primary" onClick={onNext}>
+              Next: Frame
+            </button>
+          </div>
         </div>
-        <div className="step-actions-buttons">
-          <button type="button" className="btn ghost" onClick={onBack}>
-            Back
-          </button>
-          <button type="button" className="btn primary" onClick={onNext} disabled={!isNextEnabled}>
-            Next: Frame
-          </button>
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 };

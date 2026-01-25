@@ -8,8 +8,6 @@ type StepConfig = {
 
 type StepperHeaderProps = {
   currentStep: BoothStep;
-  canNavigateTo: (step: BoothStep) => boolean;
-  onNavigate: (step: BoothStep) => void;
 };
 
 const STEPS: StepConfig[] = [
@@ -19,33 +17,34 @@ const STEPS: StepConfig[] = [
   { id: "export", label: "Export", shortLabel: "Export" },
 ];
 
-export const StepperHeader = ({ currentStep, canNavigateTo, onNavigate }: StepperHeaderProps) => {
+export const StepperHeader = ({ currentStep }: StepperHeaderProps) => {
   const currentIndex = STEPS.findIndex((step) => step.id === currentStep);
+  const safeIndex = Math.max(0, currentIndex);
+  const maxIndex = STEPS.length - 1;
+  const progressPercent = maxIndex <= 0 ? 0 : (safeIndex / maxIndex) * 100;
 
   return (
-    <nav className="stepper" aria-label="Photo booth steps">
+    <nav className="stepper" aria-label="Photo booth steps" role="list">
+      <div className="stepper-track" aria-hidden="true">
+        <div className="stepper-track-fill" style={{ width: `${progressPercent}%` }}></div>
+      </div>
       {STEPS.map((step, index) => {
         const isActive = step.id === currentStep;
-        const isComplete = index < currentIndex;
-        const isAllowed = canNavigateTo(step.id);
+        const isComplete = index < safeIndex;
         return (
-          <button
+          <div
             key={step.id}
-            type="button"
             className={`stepper-item ${isActive ? "is-active" : ""} ${
               isComplete ? "is-complete" : ""
             }`}
-            onClick={() => isAllowed && onNavigate(step.id)}
-            disabled={!isAllowed}
             aria-current={isActive ? "step" : undefined}
+            role="listitem"
           >
-            <span className="stepper-dot" aria-hidden="true">
-              {index + 1}
-            </span>
+            <span className="stepper-dot" aria-hidden="true"></span>
             <span className="stepper-label" data-full={step.label}>
               {step.shortLabel}
             </span>
-          </button>
+          </div>
         );
       })}
     </nav>

@@ -137,7 +137,7 @@ const AppShell = () => {
         </div>
       </header>
 
-      <StepperHeader currentStep={state.step} canNavigateTo={canNavigateTo} onNavigate={goToStep} />
+      <StepperHeader currentStep={state.step} />
 
       <main className="wizard">
         {state.step === "layout" && (

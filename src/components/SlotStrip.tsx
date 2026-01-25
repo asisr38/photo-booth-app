@@ -9,6 +9,7 @@ type SlotStripProps = {
   onRetakeSlot: (slotIndex: number) => void;
   onRetakeAll: () => void;
   slotsFilled: number;
+  onBack?: () => void;
 };
 
 export const SlotStrip = ({
@@ -19,6 +20,7 @@ export const SlotStrip = ({
   onRetakeSlot,
   onRetakeAll,
   slotsFilled,
+  onBack,
 }: SlotStripProps) => {
   return (
     <section className="panel slot-panel" aria-labelledby="slotTitle">
@@ -29,9 +31,16 @@ export const SlotStrip = ({
             {slotsFilled}/{layout.slotCount} filled
           </p>
         </div>
-        <button type="button" className="btn ghost" onClick={onRetakeAll} disabled={slotsFilled === 0}>
-          Retake All
-        </button>
+        <div className="slot-header-actions">
+          {onBack && (
+            <button type="button" className="btn ghost" onClick={onBack}>
+              Back
+            </button>
+          )}
+          <button type="button" className="btn ghost" onClick={onRetakeAll} disabled={slotsFilled === 0}>
+            Retake All
+          </button>
+        </div>
       </div>
 
       <div className={`slot-grid slot-count-${layout.slotCount}`}>
