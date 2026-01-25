@@ -360,9 +360,9 @@ export const renderComposition = async ({
   const minDim = Math.min(width, height);
   const borderWidth = Math.max(8, minDim * frame.borderWidthRatio);
   const radius = minDim * frame.cornerRadiusRatio;
-  const paddingX = borderWidth * 1.35;
-  const paddingTop = frame.id === "polaroid" ? paddingX * 1.08 : paddingX;
-  const paddingBottom = frame.id === "polaroid" ? paddingX * 2.25 : paddingX;
+  const paddingX = borderWidth * 1.45;
+  const paddingTop = frame.id === "polaroid" ? paddingX * 1.12 : paddingX * 1.06;
+  const paddingBottom = frame.id === "polaroid" ? paddingX * 2.7 : paddingX * 1.95;
   const gap = Math.max(6, minDim * 0.016);
 
   const outerRect: Rect = { x: 0, y: 0, w: width, h: height };

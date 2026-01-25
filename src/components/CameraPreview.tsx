@@ -32,9 +32,24 @@ type CameraPreviewProps = {
 
 type CameraState = "idle" | "requesting" | "live" | "denied" | "insecure" | "error";
 
+type CameraFilter = {
+  id: string;
+  label: string;
+  cssFilter: string;
+};
+
 const SAFE_MAX_DIMENSION = 2400;
 
 const countdownOptions: CountdownSeconds[] = [0, 3, 5, 10];
+
+const cameraFilters: CameraFilter[] = [
+  { id: "none", label: "Normal", cssFilter: "none" },
+  { id: "soft", label: "Soft", cssFilter: "brightness(1.04) saturate(1.05)" },
+  { id: "warm", label: "Warm", cssFilter: "saturate(1.12) sepia(0.18)" },
+  { id: "cool", label: "Cool", cssFilter: "saturate(1.05) hue-rotate(335deg)" },
+  { id: "mono", label: "Mono", cssFilter: "grayscale(1) contrast(1.06)" },
+  { id: "pop", label: "Pop", cssFilter: "contrast(1.12) saturate(1.18)" },
+];
 
 const labelForCountdown = (value: CountdownSeconds): string =>
   value === 0 ? "Off" : `${value}s`;
@@ -60,6 +75,7 @@ export const CameraPreview = ({
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [selectedFilterId, setSelectedFilterId] = useState<string>("none");
 
   const stopCamera = useCallback(() => {
     if (!streamRef.current) {
@@ -145,18 +161,23 @@ export const CameraPreview = ({
       return;
     }
 
+    const selectedFilter = cameraFilters.find((filter) => filter.id === selectedFilterId);
+    const filterCss = selectedFilter?.cssFilter ?? "none";
+
     if (mirrorPreview && facingMode === "user") {
       ctx.translate(width, 0);
       ctx.scale(-1, 1);
     }
 
+    ctx.filter = filterCss;
     ctx.drawImage(video, 0, 0, width, height);
+    ctx.filter = "none";
     const dataUrl = canvas.toDataURL("image/png", 1);
     onCaptured({ dataUrl, width, height });
     onStatusChange("Captured. You can retake any slot.");
     setIsCapturing(false);
     setCountdownRemaining(null);
-  }, [facingMode, mirrorPreview, onCaptured, onStatusChange]);
+  }, [facingMode, mirrorPreview, onCaptured, onStatusChange, selectedFilterId]);
 
   const handleCapture = useCallback(() => {
     if (isCapturing) {
@@ -203,6 +224,8 @@ export const CameraPreview = ({
   const isCountingDown = countdownRemaining !== null;
   const isBusy = isCapturing || isCountingDown;
   const hudShotIndex = pendingCapture ? pendingCapture.slotIndex : activeSlotIndex;
+  const selectedFilter = cameraFilters.find((filter) => filter.id === selectedFilterId);
+  const filterCss = selectedFilter?.cssFilter ?? "none";
   const fallbackMessage = isInsecure
     ? "Camera needs HTTPS or localhost."
     : isDenied
@@ -210,8 +233,14 @@ export const CameraPreview = ({
       : "Waiting for camera permission...";
 
   const videoStyle = useMemo(() => {
-    return mirrorPreview && facingMode === "user" ? { transform: "scaleX(-1)" } : undefined;
-  }, [facingMode, mirrorPreview]);
+    const style: Record<string, string> = {
+      filter: filterCss,
+    };
+    if (mirrorPreview && facingMode === "user") {
+      style.transform = "scaleX(-1)";
+    }
+    return style;
+  }, [facingMode, filterCss, mirrorPreview]);
 
   return (
     <section className="panel camera-panel" aria-labelledby="cameraTitle">
@@ -245,6 +274,50 @@ export const CameraPreview = ({
             {isCaptureComplete ? "All shots captured" : `${slotsFilled}/${slotCount} captured`}
           </div>
         </div>
+        {!pendingCapture && isLive && (
+          <div className="camera-overlay">
+            <div className="camera-filter-strip" role="group" aria-label="Filters">
+              {cameraFilters.map((filter) => {
+                const isActive = filter.id === selectedFilterId;
+                return (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    className={`camera-filter-chip ${isActive ? "is-active" : ""}`}
+                    onClick={() => setSelectedFilterId(filter.id)}
+                    aria-pressed={isActive}
+                    disabled={!isLive || isBusy}
+                    style={{ filter: filter.cssFilter }}
+                  >
+                    {filter.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="camera-controls-overlay">
+              <button
+                type="button"
+                className="btn ghost camera-flip"
+                onClick={handleFlip}
+                disabled={!isLive || isBusy}
+                aria-label="Flip camera"
+              >
+                Flip
+              </button>
+              <div className="camera-controls-spacer" aria-hidden="true"></div>
+              <button
+                type="button"
+                className="camera-shutter"
+                onClick={handleCapture}
+                disabled={!isLive || isBusy}
+                aria-label="Capture photo"
+              >
+                {isCapturing ? "..." : "●"}
+              </button>
+              <div className="camera-controls-spacer" aria-hidden="true"></div>
+            </div>
+          </div>
+        )}
         {pendingCapture && (
           <div className="camera-confirm-overlay" role="dialog" aria-live="assertive">
             <img src={pendingCapture.dataUrl} alt={`Preview for slot ${pendingCapture.slotIndex + 1}`} />
@@ -297,19 +370,6 @@ export const CameraPreview = ({
             </label>
           </div>
 
-          <div className="controls">
-            <button type="button" className="btn ghost" onClick={handleFlip} disabled={!isLive || isBusy}>
-              Flip Camera
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={handleCapture}
-              disabled={!isLive || isBusy}
-            >
-              {isCapturing ? "Capturing..." : "Capture"}
-            </button>
-          </div>
         </>
       )}
     </section>
