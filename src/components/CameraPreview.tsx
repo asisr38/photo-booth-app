@@ -1,0 +1,291 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+type CapturePayload = {
+  dataUrl: string;
+  width: number;
+  height: number;
+};
+
+type CountdownSeconds = 0 | 3 | 5 | 10;
+
+type PendingCapturePreview = {
+  slotIndex: number;
+  slotCount: number;
+  dataUrl: string;
+};
+
+type CameraPreviewProps = {
+  countdownSeconds: CountdownSeconds;
+  onCountdownChange: (seconds: CountdownSeconds) => void;
+  mirrorPreview: boolean;
+  onMirrorChange: (enabled: boolean) => void;
+  pendingCapture: PendingCapturePreview | null;
+  onConfirmPending: () => void;
+  onRetakePending: () => void;
+  onCaptured: (payload: CapturePayload) => void;
+  onStatusChange: (message: string) => void;
+};
+
+type CameraState = "idle" | "requesting" | "live" | "denied" | "insecure" | "error";
+
+const SAFE_MAX_DIMENSION = 2400;
+
+const countdownOptions: CountdownSeconds[] = [0, 3, 5, 10];
+
+const labelForCountdown = (value: CountdownSeconds): string =>
+  value === 0 ? "Off" : `${value}s`;
+
+export const CameraPreview = ({
+  countdownSeconds,
+  onCountdownChange,
+  mirrorPreview,
+  onMirrorChange,
+  pendingCapture,
+  onConfirmPending,
+  onRetakePending,
+  onCaptured,
+  onStatusChange,
+}: CameraPreviewProps) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraState, setCameraState] = useState<CameraState>("idle");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const stopCamera = useCallback(() => {
+    if (!streamRef.current) {
+      return;
+    }
+    streamRef.current.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraState("error");
+      onStatusChange("Camera access is not supported on this browser.");
+      return;
+    }
+
+    if (!window.isSecureContext) {
+      setCameraState("insecure");
+      onStatusChange("Camera needs HTTPS or localhost. Try the HTTPS dev server.");
+      return;
+    }
+
+    onStatusChange("Requesting camera access...");
+    setCameraState("requesting");
+    stopCamera();
+
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: facingMode },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (!video) {
+        setCameraState("error");
+        onStatusChange("Camera failed to initialize.");
+        return;
+      }
+
+      video.srcObject = stream;
+      await video.play();
+      setCameraState("live");
+      onStatusChange("");
+    } catch (error) {
+      setCameraState("denied");
+      onStatusChange("Camera permission was denied. Please allow access and retry.");
+    }
+  }, [facingMode, onStatusChange, stopCamera]);
+
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, [startCamera, stopCamera]);
+
+  const captureFrame = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !streamRef.current || video.readyState < 2) {
+      onStatusChange("Camera is not ready yet.");
+      setIsCapturing(false);
+      return;
+    }
+
+    const rawWidth = video.videoWidth;
+    const rawHeight = video.videoHeight;
+    const maxDimension = Math.max(rawWidth, rawHeight);
+    const scale = maxDimension > SAFE_MAX_DIMENSION ? SAFE_MAX_DIMENSION / maxDimension : 1;
+    const width = Math.max(1, Math.round(rawWidth * scale));
+    const height = Math.max(1, Math.round(rawHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      onStatusChange("Capture failed. Please try again.");
+      setIsCapturing(false);
+      return;
+    }
+
+    if (mirrorPreview && facingMode === "user") {
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+    }
+
+    ctx.drawImage(video, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL("image/png", 1);
+    onCaptured({ dataUrl, width, height });
+    onStatusChange("Captured. You can retake any slot.");
+    setIsCapturing(false);
+    setCountdownRemaining(null);
+  }, [facingMode, mirrorPreview, onCaptured, onStatusChange]);
+
+  const handleCapture = useCallback(() => {
+    if (isCapturing) {
+      return;
+    }
+
+    if (countdownSeconds === 0) {
+      setIsCapturing(true);
+      captureFrame();
+      return;
+    }
+
+    setIsCapturing(true);
+    setCountdownRemaining(countdownSeconds);
+  }, [captureFrame, countdownSeconds, isCapturing]);
+
+  useEffect(() => {
+    if (countdownRemaining === null) {
+      return;
+    }
+
+    if (countdownRemaining <= 0) {
+      captureFrame();
+      return;
+    }
+
+    onStatusChange(`Capturing in ${countdownRemaining}...`);
+    const timer = window.setTimeout(() => {
+      setCountdownRemaining((prev) => (prev === null ? prev : prev - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [captureFrame, countdownRemaining, onStatusChange]);
+
+  const handleFlip = useCallback(() => {
+    setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
+  }, []);
+
+  const isLive = cameraState === "live";
+  const isDenied = cameraState === "denied";
+  const isInsecure = cameraState === "insecure";
+  const isRequesting = cameraState === "requesting";
+  const isPending = Boolean(pendingCapture);
+  const fallbackMessage = isInsecure
+    ? "Camera needs HTTPS or localhost."
+    : isDenied
+      ? "Camera access is blocked."
+      : "Waiting for camera permission...";
+
+  const videoStyle = useMemo(() => {
+    return mirrorPreview && facingMode === "user" ? { transform: "scaleX(-1)" } : undefined;
+  }, [facingMode, mirrorPreview]);
+
+  return (
+    <section className="panel camera-panel" aria-labelledby="cameraTitle">
+      <div className="panel-header">
+        <div>
+          <h2 id="cameraTitle">Capture</h2>
+          <p>Align your subject and capture each slot.</p>
+        </div>
+      </div>
+
+      <div className={`camera-viewport ${isLive ? "is-live" : ""} ${isPending ? "is-pending" : ""}`}>
+        <video ref={videoRef} autoPlay playsInline muted style={videoStyle}></video>
+        {!isLive && (
+          <div className="camera-fallback" role="status">
+            <p>{fallbackMessage}</p>
+            {isInsecure && (
+              <p>Open this page via HTTPS (for example `npm run dev:host:https`).</p>
+            )}
+            {!isInsecure && (
+              <button type="button" className="btn primary" onClick={startCamera} disabled={isRequesting}>
+                {isRequesting ? "Opening camera..." : isDenied ? "Try Again" : "Enable Camera"}
+              </button>
+            )}
+          </div>
+        )}
+        {pendingCapture && (
+          <div className="camera-confirm-overlay" role="dialog" aria-live="assertive">
+            <img src={pendingCapture.dataUrl} alt={`Preview for slot ${pendingCapture.slotIndex + 1}`} />
+            <div className="camera-confirm-meta">
+              Slot {pendingCapture.slotIndex + 1} of {pendingCapture.slotCount}
+            </div>
+          </div>
+        )}
+        {countdownRemaining !== null && countdownRemaining > 0 && (
+          <div className="camera-countdown" aria-live="assertive">
+            {countdownRemaining}
+          </div>
+        )}
+      </div>
+
+      {pendingCapture ? (
+        <div className="controls camera-confirm-actions">
+          <button type="button" className="btn ghost" onClick={onRetakePending}>
+            Retake
+          </button>
+          <button type="button" className="btn primary" onClick={onConfirmPending}>
+            Use Photo
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="camera-toolbar">
+            <div className="countdown-group" role="group" aria-label="Countdown options">
+              {countdownOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={`countdown-chip ${countdownSeconds === option ? "is-active" : ""}`}
+                  onClick={() => onCountdownChange(option)}
+                  aria-pressed={countdownSeconds === option}
+                >
+                  {labelForCountdown(option)}
+                </button>
+              ))}
+            </div>
+            <label className="mirror-toggle">
+              <input
+                type="checkbox"
+                checked={mirrorPreview}
+                onChange={(event) => onMirrorChange(event.target.checked)}
+              />
+              <span>Mirror preview</span>
+            </label>
+          </div>
+
+          <div className="controls">
+            <button type="button" className="btn ghost" onClick={handleFlip}>
+              Flip Camera
+            </button>
+            <button type="button" className="btn primary" onClick={handleCapture} disabled={!isLive}>
+              {isCapturing ? "Capturing..." : "Capture"}
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+};
