@@ -362,7 +362,7 @@ export const renderComposition = async ({
   const radius = minDim * frame.cornerRadiusRatio;
   const paddingX = borderWidth * 1.45;
   const paddingTop = frame.id === "polaroid" ? paddingX * 1.12 : paddingX * 1.06;
-  const paddingBottom = frame.id === "polaroid" ? paddingX * 2.7 : paddingX * 1.95;
+  const paddingBottom = frame.id === "polaroid" ? paddingX * 3.25 : paddingX * 2.35;
   const gap = Math.max(6, minDim * 0.016);
 
   const outerRect: Rect = { x: 0, y: 0, w: width, h: height };

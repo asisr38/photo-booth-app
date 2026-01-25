@@ -287,7 +287,6 @@ export const CameraPreview = ({
                     onClick={() => setSelectedFilterId(filter.id)}
                     aria-pressed={isActive}
                     disabled={!isLive || isBusy}
-                    style={{ filter: filter.cssFilter }}
                   >
                     {filter.label}
                   </button>
@@ -297,24 +296,61 @@ export const CameraPreview = ({
             <div className="camera-controls-overlay">
               <button
                 type="button"
-                className="btn ghost camera-flip"
+                className="camera-flip camera-icon-btn"
                 onClick={handleFlip}
                 disabled={!isLive || isBusy}
                 aria-label="Flip camera"
               >
-                Flip
+                <svg
+                  className="camera-icon"
+                  viewBox="0 0 24 24"
+                  width="22"
+                  height="22"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M7 7h7a4 4 0 0 1 4 4v1"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M18 6v6h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M17 17h-7a4 4 0 0 1-4-4v-1"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M6 18v-6h6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
-              <div className="camera-controls-spacer" aria-hidden="true"></div>
               <button
                 type="button"
-                className="camera-shutter"
+                className={`camera-shutter ${isCapturing ? "is-busy" : ""}`}
                 onClick={handleCapture}
                 disabled={!isLive || isBusy}
                 aria-label="Capture photo"
               >
-                {isCapturing ? "..." : "●"}
+                <span className="camera-shutter-core" aria-hidden="true"></span>
               </button>
-              <div className="camera-controls-spacer" aria-hidden="true"></div>
             </div>
           </div>
         )}
