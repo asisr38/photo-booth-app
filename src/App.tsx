@@ -11,7 +11,6 @@ import { BoothProvider, type BoothStep, useBoothStore } from "./store/useBoothSt
 const AppShell = () => {
   const { state, derived, actions } = useBoothStore();
   const [status, setStatus] = useState("");
-  const [pendingAutoAdvance, setPendingAutoAdvance] = useState<"frame" | null>(null);
 
   const layout = derived.layout;
   const frame = useMemo(() => getFrameById(state.selectedFrameId), [state.selectedFrameId]);
@@ -24,16 +23,6 @@ const AppShell = () => {
       }
     }
   }, [actions, derived.isCaptureComplete, state.step]);
-
-  useEffect(() => {
-    if (!pendingAutoAdvance) {
-      return;
-    }
-    if (pendingAutoAdvance === "frame" && derived.isCaptureComplete) {
-      actions.setStep("frame");
-      setPendingAutoAdvance(null);
-    }
-  }, [actions, derived.isCaptureComplete, pendingAutoAdvance]);
 
   const canNavigateTo = (step: BoothStep): boolean => {
     if (step === "layout") {
@@ -111,7 +100,7 @@ const AppShell = () => {
   };
 
   const handleCaptureComplete = () => {
-    setPendingAutoAdvance("frame");
+    setStatus("All shots captured. Review and retake if needed.");
   };
 
   const handleStartOver = () => {

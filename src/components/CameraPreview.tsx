@@ -28,6 +28,8 @@ type CameraPreviewProps = {
   onRetakePending: () => void;
   onCaptured: (payload: CapturePayload) => void;
   onStatusChange: (message: string) => void;
+  onBack?: () => void;
+  showBackButton?: boolean;
 };
 
 type CameraState = "idle" | "requesting" | "live" | "denied" | "insecure" | "error";
@@ -68,6 +70,8 @@ export const CameraPreview = ({
   onRetakePending,
   onCaptured,
   onStatusChange,
+  onBack,
+  showBackButton = false,
 }: CameraPreviewProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -249,6 +253,31 @@ export const CameraPreview = ({
           <h2 id="cameraTitle">Capture</h2>
           <p>Align your subject and capture each slot.</p>
         </div>
+        {showBackButton && onBack ? (
+          <button
+            type="button"
+            className="camera-header-back camera-icon-btn"
+            onClick={onBack}
+            aria-label="Back to layout"
+          >
+            <svg
+              className="camera-icon"
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              aria-hidden="true"
+            >
+              <path
+                d="M15 18l-6-6 6-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : null}
       </div>
 
       <div className={`camera-viewport ${isLive ? "is-live" : ""} ${isPending ? "is-pending" : ""}`}>

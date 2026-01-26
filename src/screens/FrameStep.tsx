@@ -35,6 +35,11 @@ export const FrameStep = ({
 }: FrameStepProps) => {
   const frame = getFrameById(selectedFrameId);
   const isNextEnabled = shots.length >= layout.slotCount;
+  const frameCount = FRAME_STYLES.length;
+  const currentFrameIndex = Math.max(
+    0,
+    FRAME_STYLES.findIndex((item) => item.id === selectedFrameId)
+  );
 
   const handleFrameSelect = (frameId: string) => {
     onSelectFrame(frameId);
@@ -50,6 +55,19 @@ export const FrameStep = ({
     onSetCaption(value.slice(0, CAPTION_LIMIT));
   };
 
+  const handleFrameSwipe = (direction: "next" | "prev") => {
+    if (frameCount <= 1) {
+      return;
+    }
+    const delta = direction === "next" ? 1 : -1;
+    const nextIndex = (currentFrameIndex + delta + frameCount) % frameCount;
+    const nextFrame = FRAME_STYLES[nextIndex];
+    if (!nextFrame || nextFrame.id === selectedFrameId) {
+      return;
+    }
+    handleFrameSelect(nextFrame.id);
+  };
+
   return (
     <div className="step step-frame" role="tabpanel" aria-labelledby="step-frame">
       <div className="step-grid">
@@ -57,11 +75,16 @@ export const FrameStep = ({
           layout={layout}
           shots={shots}
           frame={frame}
+          frames={FRAME_STYLES}
+          selectedFrameId={selectedFrameId}
           captionText={captionText}
           watermarkEnabled={watermarkEnabled}
+          onSwipeFrame={handleFrameSwipe}
         />
         <div className="frame-side">
-          <FramePicker frames={FRAME_STYLES} selectedFrameId={frame.id} onSelect={handleFrameSelect} />
+          <div className="frame-picker-wrap">
+            <FramePicker frames={FRAME_STYLES} selectedFrameId={frame.id} onSelect={handleFrameSelect} />
+          </div>
           <section className="panel edit-panel" aria-labelledby="editTitle">
             <div className="panel-header">
               <div>

@@ -65,11 +65,16 @@ export const CaptureStep = ({
 }: CaptureStepProps) => {
   const [activeSlotIndex, setActiveSlotIndex] = useState(nextEmptySlotIndex);
   const [pendingCapture, setPendingCapture] = useState<PendingCapture | null>(null);
+  const [showShotsPanel, setShowShotsPanel] = useState(false);
 
   useEffect(() => {
     setActiveSlotIndex(nextEmptySlotIndex);
     setPendingCapture(null);
   }, [layout.id, nextEmptySlotIndex]);
+
+  useEffect(() => {
+    setShowShotsPanel(false);
+  }, [layout.id]);
 
   const activeSlotSafe = useMemo(() => {
     return Math.min(Math.max(0, activeSlotIndex), layout.slotCount - 1);
@@ -111,7 +116,7 @@ export const CaptureStep = ({
     setPendingCapture(null);
 
     if (filledCount >= layout.slotCount) {
-      onStatusChange("All shots captured. Choose a frame.");
+      onStatusChange("All shots captured. Review and retake if needed.");
       onCaptureComplete();
       return;
     }
@@ -136,11 +141,22 @@ export const CaptureStep = ({
     setPendingCapture(null);
     onRetakeAll();
     setActiveSlotIndex(0);
+    setShowShotsPanel(false);
     onStatusChange("All slots cleared. Start again.");
   };
 
   const isCaptureComplete = slotsFilled >= layout.slotCount && !pendingCapture;
-  const stepClassName = `step step-capture ${isCaptureComplete ? "has-sticky-actions" : ""}`;
+
+  useEffect(() => {
+    if (isCaptureComplete) {
+      setShowShotsPanel(true);
+    }
+  }, [isCaptureComplete]);
+
+  const showCameraBackButton = !showShotsPanel && !pendingCapture;
+  const stepClassName = `step step-capture ${isCaptureComplete ? "has-sticky-actions" : ""} ${
+    showShotsPanel ? "has-shots-panel" : "is-camera-only"
+  }`;
 
   return (
     <div className={stepClassName} role="tabpanel" aria-labelledby="step-capture">
@@ -167,17 +183,21 @@ export const CaptureStep = ({
           onRetakePending={handleRetakePending}
           onCaptured={handleCaptured}
           onStatusChange={onStatusChange}
-        />
-        <SlotStrip
-          layout={layout}
-          shotsBySlot={shotsBySlot}
-          activeSlotIndex={activeSlotSafe}
-          onSelectSlot={handleSelectSlot}
-          onRetakeSlot={handleRetakeSlot}
-          onRetakeAll={handleRetakeAll}
-          slotsFilled={slotsFilled}
           onBack={onBack}
+          showBackButton={showCameraBackButton}
         />
+        {showShotsPanel ? (
+          <SlotStrip
+            layout={layout}
+            shotsBySlot={shotsBySlot}
+            activeSlotIndex={activeSlotSafe}
+            onSelectSlot={handleSelectSlot}
+            onRetakeSlot={handleRetakeSlot}
+            onRetakeAll={handleRetakeAll}
+            slotsFilled={slotsFilled}
+            onBack={onBack}
+          />
+        ) : null}
       </div>
 
       {isCaptureComplete ? (
