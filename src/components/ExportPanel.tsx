@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import logoPlayful from "../assets/logo/papersnap-playful.png";
 import type { FrameStyle } from "../lib/frames";
 import type { LayoutTemplate } from "../lib/layouts";
 import { renderComposition } from "../lib/canvas/renderComposition";
@@ -41,13 +42,122 @@ const isValidEmail = (value: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
 };
 
-const downloadBlob = (blob: Blob, filename: string) => {
+type FilePickerHandle = {
+  createWritable: () => Promise<{
+    write: (data: Blob) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+
+type SaveFilePickerOptions = {
+  suggestedName?: string;
+  types?: Array<{
+    description?: string;
+    accept: Record<string, string[]>;
+  }>;
+};
+
+type SaveFilePicker = (options?: SaveFilePickerOptions) => Promise<FilePickerHandle>;
+
+const supportsDownloadAttribute = (): boolean => {
+  const link = document.createElement("a");
+  return typeof link.download !== "undefined";
+};
+
+const isLikelyIos = (): boolean => {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+  const ua = navigator.userAgent || "";
+  const isAppleDevice = /iPad|iPhone|iPod/.test(ua);
+  const isIpadOs = /Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
+  return isAppleDevice || isIpadOs;
+};
+
+const getSaveFilePicker = (): SaveFilePicker | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const picker = (window as Window & { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+  return picker ?? null;
+};
+
+const createExportBlob = async (
+  canvas: HTMLCanvasElement,
+  mime: string,
+  qualityValue: number
+): Promise<Blob | null> => {
+  try {
+    if (typeof canvas.toBlob === "function") {
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, mime, qualityValue)
+      );
+      if (blob) {
+        return blob;
+      }
+    }
+    const dataUrl = canvas.toDataURL(mime, qualityValue);
+    if (typeof fetch === "function") {
+      const response = await fetch(dataUrl);
+      return await response.blob();
+    }
+    const parts = dataUrl.split(",");
+    if (parts.length < 2) {
+      return null;
+    }
+    const header = parts[0] ?? "";
+    const data = parts[1] ?? "";
+    const isBase64 = /;base64/i.test(header);
+    const mimeMatch = header.match(/data:([^;]+)/i);
+    const resolvedMime = mimeMatch ? mimeMatch[1] : mime;
+    const raw = isBase64 ? atob(data) : decodeURIComponent(data);
+    const buffer = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i += 1) {
+      buffer[i] = raw.charCodeAt(i);
+    }
+    return new Blob([buffer], { type: resolvedMime });
+  } catch (error) {
+    return null;
+  }
+};
+
+const downloadWithAnchor = (blob: Blob, filename: string): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  if (!supportsDownloadAttribute() || isLikelyIos()) {
+    return false;
+  }
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+  return true;
+};
+
+const tryShareFile = async (blob: Blob, filename: string): Promise<boolean> => {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+  if (!("share" in navigator)) {
+    return false;
+  }
+  const file = new File([blob], filename, { type: blob.type });
+  if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
+    return false;
+  }
+  try {
+    await navigator.share({ files: [file], title: filename });
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
 
 export const ExportPanel = ({
@@ -88,6 +198,31 @@ export const ExportPanel = ({
     setIsExporting(true);
     onStatusChange(`Rendering ${format.toUpperCase()}...`);
 
+    const filename = `photo-booth-${layout.id}-${quality}.${format === "png" ? "png" : "jpg"}`;
+    const mime = format === "png" ? "image/png" : "image/jpeg";
+    const extension = format === "png" ? ".png" : ".jpg";
+    const picker = getSaveFilePicker();
+    let fileHandle: FilePickerHandle | null = null;
+
+    if (picker && !isLikelyIos()) {
+      try {
+        fileHandle = await picker({
+          suggestedName: filename,
+          types: [
+            {
+              description: format === "png" ? "PNG image" : "JPEG image",
+              accept: {
+                [mime]: [extension],
+              },
+            },
+          ],
+        });
+      } catch (error) {
+        setIsExporting(false);
+        return;
+      }
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = exportMeta.width;
     canvas.height = exportMeta.height;
@@ -110,23 +245,54 @@ export const ExportPanel = ({
         watermarkEnabled,
       });
 
-      const mime = format === "png" ? "image/png" : "image/jpeg";
       const qualityValue = format === "jpeg" ? (quality === "high" ? 0.94 : 0.88) : 1;
+      const blob = await createExportBlob(canvas, mime, qualityValue);
+      if (!blob) {
+        setIsExporting(false);
+        onStatusChange("Export failed. Please try again.");
+        return;
+      }
 
-      canvas.toBlob(
-        (blob) => {
-          setIsExporting(false);
-          if (!blob) {
-            onStatusChange("Export failed. Please try again.");
-            return;
-          }
-          const filename = `photo-booth-${layout.id}-${quality}.${format === "png" ? "png" : "jpg"}`;
-          downloadBlob(blob, filename);
-          onStatusChange(`${format.toUpperCase()} downloaded.`);
-        },
-        mime,
-        qualityValue
-      );
+      if (fileHandle) {
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        setIsExporting(false);
+        onStatusChange("Saved to your device.");
+        return;
+      }
+
+      if (isLikelyIos()) {
+        const shared = await tryShareFile(blob, filename);
+        setIsExporting(false);
+        if (shared) {
+          onStatusChange("Share sheet opened.");
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener,noreferrer");
+        window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+        onStatusChange("Image opened. Long-press to save.");
+        return;
+      }
+
+      const didDownload = downloadWithAnchor(blob, filename);
+      setIsExporting(false);
+      if (didDownload) {
+        onStatusChange(`${format.toUpperCase()} downloaded.`);
+        return;
+      }
+
+      const shared = await tryShareFile(blob, filename);
+      if (shared) {
+        onStatusChange("Share sheet opened.");
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      onStatusChange("Image opened. Save or share from the new tab.");
     } catch (error) {
       setIsExporting(false);
       onStatusChange("Export failed. Please try again.");
@@ -140,7 +306,10 @@ export const ExportPanel = ({
     <section className="panel export-panel" aria-labelledby="exportTitle">
       <div className="panel-header export-header">
         <div>
-          <h2 id="exportTitle">Export</h2>
+          <div className="export-title-row">
+            <img src={logoPlayful} alt="" className="export-title-mark" aria-hidden="true" />
+            <h2 id="exportTitle">Export</h2>
+          </div>
           <p>Download a polished output ready to print.</p>
         </div>
         <button type="button" className="btn ghost" onClick={onStartOver}>

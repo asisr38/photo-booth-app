@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { StepperHeader } from "./components/StepperHeader";
+import logoIcon from "./assets/logo/papersnap-icon.png";
+import logoMain from "./assets/logo/papersnap-main.png";
 import { FUJI_FRAME_ID, getFrameById } from "./lib/frames";
 import { getLayoutById } from "./lib/layouts";
 import { CaptureStep } from "./screens/CaptureStep";
@@ -118,13 +120,14 @@ const AppShell = () => {
     <div className="app-shell">
       <header className="hero">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            PB
-          </span>
-          <div>
-            <h1>Paper Snap</h1>
-            <p>Classy mobile photo booth.</p>
+          <div className="brand-logo-group">
+            <img src={logoMain} alt="PaperSnap Photo Booth" className="brand-logo-main" />
+            <span className="brand-mark" aria-hidden="true">
+              <img src={logoIcon} alt="" />
+            </span>
+            <h1 className="brand-title">PaperSnap</h1>
           </div>
+          <p className="brand-tagline">Classy mobile photo booth.</p>
         </div>
         <div className="status" role="status" aria-live="polite">
           {status}

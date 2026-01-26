@@ -56,6 +56,13 @@ const cameraFilters: CameraFilter[] = [
 const labelForCountdown = (value: CountdownSeconds): string =>
   value === 0 ? "Off" : `${value}s`;
 
+const getMediaErrorName = (error: unknown): string => {
+  if (error && typeof error === "object" && "name" in error) {
+    return String((error as { name?: string }).name ?? "");
+  }
+  return "";
+};
+
 export const CameraPreview = ({
   activeSlotIndex,
   slotCount,
@@ -87,6 +94,9 @@ export const CameraPreview = ({
     }
     streamRef.current.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -96,7 +106,7 @@ export const CameraPreview = ({
       return;
     }
 
-    if (!window.isSecureContext) {
+    if (typeof window.isSecureContext === "boolean" && !window.isSecureContext) {
       setCameraState("insecure");
       onStatusChange("Camera needs HTTPS or localhost. Try the HTTPS dev server.");
       return;
@@ -107,16 +117,75 @@ export const CameraPreview = ({
     stopCamera();
 
     try {
-      const constraints: MediaStreamConstraints = {
-        audio: false,
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+      const candidates: MediaStreamConstraints[] = [
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         },
-      };
+        {
+          audio: false,
+          video: {
+            facingMode,
+          },
+        },
+        {
+          audio: false,
+          video: true,
+        },
+      ];
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream | null = null;
+      let lastError: unknown = null;
+
+      for (const constraints of candidates) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (error) {
+          lastError = error;
+          const name = getMediaErrorName(error);
+          if (name === "NotAllowedError" || name === "SecurityError" || name === "NotSupportedError") {
+            break;
+          }
+        }
+      }
+
+      if (!stream) {
+        const name = getMediaErrorName(lastError);
+        if (name === "NotAllowedError") {
+          setCameraState("denied");
+          onStatusChange("Camera permission was denied. Please allow access and retry.");
+          return;
+        }
+        if (name === "SecurityError") {
+          setCameraState("insecure");
+          onStatusChange("Camera needs HTTPS or localhost. Try the HTTPS dev server.");
+          return;
+        }
+        if (name === "NotFoundError") {
+          setCameraState("error");
+          onStatusChange("No camera was found on this device.");
+          return;
+        }
+        if (name === "NotReadableError") {
+          setCameraState("error");
+          onStatusChange("Camera is already in use. Close other apps and retry.");
+          return;
+        }
+        if (name === "OverconstrainedError") {
+          setCameraState("error");
+          onStatusChange("Camera settings are not supported on this device.");
+          return;
+        }
+        setCameraState("error");
+        onStatusChange("Camera failed to initialize.");
+        return;
+      }
+
       streamRef.current = stream;
       const video = videoRef.current;
       if (!video) {
@@ -125,13 +194,22 @@ export const CameraPreview = ({
         return;
       }
 
+      video.setAttribute("playsinline", "true");
+      video.setAttribute("webkit-playsinline", "true");
       video.srcObject = stream;
-      await video.play();
+      try {
+        await video.play();
+      } catch (error) {
+        stopCamera();
+        setCameraState("error");
+        onStatusChange("Camera preview failed to start. Tap enable to retry.");
+        return;
+      }
       setCameraState("live");
       onStatusChange("");
     } catch (error) {
-      setCameraState("denied");
-      onStatusChange("Camera permission was denied. Please allow access and retry.");
+      setCameraState("error");
+      onStatusChange("Camera failed to initialize.");
     }
   }, [facingMode, onStatusChange, stopCamera]);
 

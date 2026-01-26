@@ -117,7 +117,7 @@ export const FrameStep = ({
                 />
                 <div>
                   <span className="form-label">Watermark</span>
-                  <p>Adds a small Paper Snap mark in the corner.</p>
+                  <p>Adds the PaperSnap wordmark in the corner.</p>
                 </div>
               </label>
             </div>

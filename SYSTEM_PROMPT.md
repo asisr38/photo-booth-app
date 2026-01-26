@@ -28,3 +28,10 @@ Acceptance criteria
 - Works on a mobile browser once built/run via Vite.
 - User can select a layout, capture a photo, confirm, and download a print-ready PNG.
 - UI is responsive, clear, and touch-friendly.
+
+Testing and robustness
+- Add unit tests for layout and frame definitions (ids unique, slot bounds, aspect ratios).
+- Add store logic tests (slot clamping, retake flow, step progression).
+- Add component tests for capture and export gating (pending capture, email validation).
+- Add renderComposition coverage with a mocked canvas context to prevent runtime regressions.
+- Add manual QA for camera permissions, HTTPS requirements, and iOS download/share behavior.

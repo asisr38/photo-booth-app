@@ -8,7 +8,8 @@ export type FrameOverlayKind =
   | "neon"
   | "gold"
   | "vintage"
-  | "party";
+  | "party"
+  | "hearts";
 
 export type FrameStyle = {
   id: string;
@@ -90,6 +91,28 @@ export const FRAME_STYLES: FrameStyle[] = [
     borderColor: "#7ddad0",
     overlayKind: "none",
     shadowStrength: 0.12,
+  },
+  {
+    id: "valentine",
+    name: "Valentine",
+    description: "Rosy blush border with floating hearts.",
+    borderWidthRatio: 0.024,
+    cornerRadiusRatio: 0.08,
+    backgroundColor: "#fff1f5",
+    borderColor: "#ff7aa2",
+    overlayKind: "hearts",
+    shadowStrength: 0.11,
+  },
+  {
+    id: "love-letter",
+    name: "Love Letter",
+    description: "Soft ivory with romantic heart accents.",
+    borderWidthRatio: 0.02,
+    cornerRadiusRatio: 0.06,
+    backgroundColor: "#fff7f1",
+    borderColor: "#ffb4c8",
+    overlayKind: "hearts",
+    shadowStrength: 0.1,
   },
   {
     id: "sticker",

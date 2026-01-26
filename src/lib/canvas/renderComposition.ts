@@ -1,4 +1,5 @@
 import { FUJI_FRAME_ID, type FrameStyle } from "../frames";
+import logoWordmark from "../../assets/logo/papersnap-wordmark.png";
 import type { LayoutTemplate, SlotRect } from "../layouts";
 import type { BoothShot } from "../../store/useBoothStore";
 
@@ -33,19 +34,49 @@ const createSeededRandom = (seed = 42) => {
   };
 };
 
-const loadImage = async (src: string): Promise<LoadedImage> => {
-  if ("createImageBitmap" in window) {
-    const response = await fetch(src);
-    const blob = await response.blob();
-    return createImageBitmap(blob);
-  }
+const isDataUrl = (src: string): boolean => src.startsWith("data:");
 
-  return new Promise((resolve, reject) => {
+const isBlobUrl = (src: string): boolean => src.startsWith("blob:");
+
+const loadImageElement = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
     const img = new Image();
+    img.decoding = "async";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Failed to load image"));
     img.src = src;
   });
+
+const loadImage = async (src: string): Promise<LoadedImage> => {
+  if ("createImageBitmap" in window && !isDataUrl(src) && !isBlobUrl(src)) {
+    try {
+      const response = await fetch(src);
+      const blob = await response.blob();
+      return await createImageBitmap(blob);
+    } catch (error) {
+      return loadImageElement(src);
+    }
+  }
+
+  return loadImageElement(src);
+};
+
+let watermarkImagePromise: Promise<LoadedImage | null> | null = null;
+let watermarkImageCache: LoadedImage | null = null;
+
+const getWatermarkImage = async (): Promise<LoadedImage | null> => {
+  if (watermarkImageCache) {
+    return watermarkImageCache;
+  }
+  if (!watermarkImagePromise) {
+    watermarkImagePromise = loadImage(logoWordmark)
+      .then((image) => {
+        watermarkImageCache = image;
+        return image;
+      })
+      .catch(() => null);
+  }
+  return watermarkImagePromise;
 };
 
 const drawRoundedRectPath = (
@@ -68,14 +99,30 @@ const drawImageCover = (
   image: LoadedImage,
   rect: Rect
 ) => {
-  const imageWidth = (image as HTMLImageElement | ImageBitmap).width;
-  const imageHeight = (image as HTMLImageElement | ImageBitmap).height;
+  const isImageElement =
+    typeof HTMLImageElement !== "undefined" && image instanceof HTMLImageElement;
+  const imageWidth = isImageElement ? image.naturalWidth || image.width : image.width;
+  const imageHeight = isImageElement ? image.naturalHeight || image.height : image.height;
+  if (!imageWidth || !imageHeight) {
+    return;
+  }
   const scale = Math.max(rect.w / imageWidth, rect.h / imageHeight);
   const drawWidth = imageWidth * scale;
   const drawHeight = imageHeight * scale;
   const dx = rect.x - (drawWidth - rect.w) / 2;
   const dy = rect.y - (drawHeight - rect.h) / 2;
   ctx.drawImage(image, dx, dy, drawWidth, drawHeight);
+};
+
+const addRoundedRectPath = (ctx: CanvasRenderingContext2D, rect: Rect, radius: number) => {
+  const r = clamp(radius, 0, Math.min(rect.w, rect.h) / 2);
+  if (typeof ctx.roundRect === "function") {
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.w, rect.h, r);
+    ctx.closePath();
+    return;
+  }
+  drawRoundedRectPath(ctx, rect, r);
 };
 
 const mapSlotRect = (
@@ -207,8 +254,11 @@ const drawRibbonOverlay = (
     ctx.fillStyle = "rgba(255, 229, 180, 0.8)";
     ctx.strokeStyle = "rgba(182, 140, 80, 0.35)";
     ctx.lineWidth = Math.max(1, borderWidth * 0.08);
-    ctx.beginPath();
-    ctx.roundRect(-tapeWidth / 2, -tapeHeight / 2, tapeWidth, tapeHeight, tapeHeight * 0.4);
+    addRoundedRectPath(
+      ctx,
+      { x: -tapeWidth / 2, y: -tapeHeight / 2, w: tapeWidth, h: tapeHeight },
+      tapeHeight * 0.4
+    );
     ctx.fill();
     ctx.stroke();
     ctx.restore();
@@ -292,6 +342,68 @@ const drawPartyOverlay = (ctx: CanvasRenderingContext2D, rect: Rect) => {
   ctx.restore();
 };
 
+const drawHeartPath = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => {
+  const topCurveHeight = size * 0.3;
+  ctx.beginPath();
+  ctx.moveTo(x, y + topCurveHeight);
+  ctx.bezierCurveTo(
+    x,
+    y,
+    x - size / 2,
+    y,
+    x - size / 2,
+    y + topCurveHeight
+  );
+  ctx.bezierCurveTo(
+    x - size / 2,
+    y + (size + topCurveHeight) / 2,
+    x,
+    y + (size + topCurveHeight) / 2,
+    x,
+    y + size
+  );
+  ctx.bezierCurveTo(
+    x,
+    y + (size + topCurveHeight) / 2,
+    x + size / 2,
+    y + (size + topCurveHeight) / 2,
+    x + size / 2,
+    y + topCurveHeight
+  );
+  ctx.bezierCurveTo(x + size / 2, y, x, y, x, y + topCurveHeight);
+  ctx.closePath();
+};
+
+const drawHeartsOverlay = (ctx: CanvasRenderingContext2D, rect: Rect) => {
+  const rand = createSeededRandom(212);
+  const heartCount = 18;
+  const colors = ["#ff7aa2", "#ff9fc1", "#ffc1d6", "#ffd6e3"];
+
+  ctx.save();
+  drawRoundedRectPath(ctx, rect, Math.min(rect.w, rect.h) * 0.06);
+  ctx.clip();
+
+  for (let i = 0; i < heartCount; i += 1) {
+    const size = rect.w * (0.035 + rand() * 0.04);
+    const edgeBias = rand() > 0.5 ? rand() * 0.2 : 0.8 + rand() * 0.2;
+    const x = rect.x + rect.w * edgeBias;
+    const y = rect.y + rect.h * (rand() * 0.25 + (rand() > 0.5 ? 0 : 0.75));
+    const color = colors[Math.floor(rand() * colors.length)];
+    const rotation = (rand() - 0.5) * 0.5;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.55 + rand() * 0.25;
+    drawHeartPath(ctx, 0, 0, size);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+  ctx.globalAlpha = 1;
+};
+
 const drawNeonOverlay = (
   ctx: CanvasRenderingContext2D,
   rect: Rect,
@@ -321,29 +433,59 @@ const drawCaption = (
   const fontSize = Math.max(18, borderWidth * 1.8);
   ctx.save();
   ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
-  ctx.font = `600 ${fontSize}px Manrope, system-ui, sans-serif`;
+  ctx.font = `600 ${fontSize}px "Cormorant Garamond", "Times New Roman", serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   ctx.fillText(captionText.trim(), outerRect.x + outerRect.w / 2, outerRect.y + outerRect.h - borderWidth * 1.6);
   ctx.restore();
 };
 
-const drawWatermark = (
+const drawWatermark = async (
   ctx: CanvasRenderingContext2D,
   outerRect: Rect,
   borderWidth: number,
   enabled: boolean
-) => {
+): Promise<void> => {
   if (!enabled) {
     return;
   }
+
+  const image = await getWatermarkImage();
+  if (image) {
+    const imageWidth =
+      image instanceof HTMLImageElement ? image.naturalWidth || image.width : image.width;
+    const imageHeight =
+      image instanceof HTMLImageElement ? image.naturalHeight || image.height : image.height;
+    if (imageWidth && imageHeight) {
+      const maxWidth = outerRect.w * 0.34;
+      const targetHeight = Math.max(14, borderWidth * 1.4);
+      let drawHeight = targetHeight;
+      let drawWidth = (imageWidth / imageHeight) * drawHeight;
+      if (drawWidth > maxWidth) {
+        drawWidth = maxWidth;
+        drawHeight = (imageHeight / imageWidth) * drawWidth;
+      }
+      const x = outerRect.x + outerRect.w - borderWidth * 1.2 - drawWidth;
+      const y = outerRect.y + outerRect.h - borderWidth * 0.7 - drawHeight;
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(image, x, y, drawWidth, drawHeight);
+      ctx.restore();
+      return;
+    }
+  }
+
   const fontSize = Math.max(16, borderWidth * 1.5);
   ctx.save();
   ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
   ctx.font = `700 ${fontSize}px Manrope, system-ui, sans-serif`;
   ctx.textAlign = "right";
   ctx.textBaseline = "bottom";
-  ctx.fillText("Paper Snap", outerRect.x + outerRect.w - borderWidth * 1.4, outerRect.y + outerRect.h - borderWidth * 0.8);
+  ctx.fillText(
+    "PaperSnap",
+    outerRect.x + outerRect.w - borderWidth * 1.4,
+    outerRect.y + outerRect.h - borderWidth * 0.8
+  );
   ctx.restore();
 };
 
@@ -464,10 +606,12 @@ export const renderComposition = async ({
     drawRibbonOverlay(ctx, outerRect, radius, borderWidth);
   } else if (frame.overlayKind === "sticker") {
     drawStickerOverlay(ctx, outerRect, radius, borderWidth);
+  } else if (frame.overlayKind === "hearts") {
+    drawHeartsOverlay(ctx, outerRect);
   } else if (frame.overlayKind === "neon") {
     drawNeonOverlay(ctx, outerRect, radius, borderWidth, frame.borderColor);
   }
 
   drawCaption(ctx, outerRect, borderWidth, captionText);
-  drawWatermark(ctx, outerRect, borderWidth, watermarkEnabled);
+  await drawWatermark(ctx, outerRect, borderWidth, watermarkEnabled);
 };

@@ -102,7 +102,7 @@ const defaultState: BoothState = {
   countdownSeconds: 3,
   selectedFrameId: DEFAULT_FRAME_ID,
   captionText: "",
-  watermarkEnabled: false,
+  watermarkEnabled: true,
   mirrorPreview: true,
   email: "",
 };

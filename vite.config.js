@@ -1,9 +1,15 @@
 import { defineConfig } from "vite";
+import legacy from "@vitejs/plugin-legacy";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(async () => {
   const enableHttps = process.env.VITE_DEV_HTTPS === "1";
-  const plugins = [react()];
+  const plugins = [
+    react(),
+    legacy({
+      targets: ["defaults", "iOS >= 12", "Android >= 7"],
+    }),
+  ];
   let httpsEnabled = false;
 
   if (enableHttps) {
@@ -28,6 +34,10 @@ export default defineConfig(async () => {
       host: true,
       port: 4173,
       https: httpsEnabled,
+    },
+    test: {
+      environment: "jsdom",
+      setupFiles: "./src/test/setup.ts",
     },
   };
 });
