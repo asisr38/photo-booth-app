@@ -1,4 +1,4 @@
-import type { FrameStyle } from "../frames";
+import { FUJI_FRAME_ID, type FrameStyle } from "../frames";
 import type { LayoutTemplate, SlotRect } from "../layouts";
 import type { BoothShot } from "../../store/useBoothStore";
 
@@ -361,8 +361,9 @@ export const renderComposition = async ({
   const borderWidth = Math.max(8, minDim * frame.borderWidthRatio);
   const radius = minDim * frame.cornerRadiusRatio;
   const paddingX = borderWidth * 1.45;
-  const paddingTop = frame.id === "polaroid" ? paddingX * 1.12 : paddingX * 1.06;
-  const paddingBottom = frame.id === "polaroid" ? paddingX * 3.25 : paddingX * 2.35;
+  const isInstantFrame = frame.id === "polaroid" || frame.id === FUJI_FRAME_ID;
+  const paddingTop = isInstantFrame ? paddingX * 1.12 : paddingX * 1.06;
+  const paddingBottom = isInstantFrame ? paddingX * 3.25 : paddingX * 2.35;
   const gap = Math.max(6, minDim * 0.016);
 
   const outerRect: Rect = { x: 0, y: 0, w: width, h: height };

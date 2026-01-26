@@ -1,6 +1,6 @@
 import { CompositionCanvasPreview } from "../components/CompositionCanvasPreview";
 import { FramePicker } from "../components/FramePicker";
-import { FRAME_STYLES, getFrameById } from "../lib/frames";
+import { FRAME_STYLES, FUJI_FRAME_ID, getFrameById } from "../lib/frames";
 import type { LayoutTemplate } from "../lib/layouts";
 import type { BoothShot } from "../store/useBoothStore";
 
@@ -44,6 +44,11 @@ export const FrameStep = ({
   const handleFrameSelect = (frameId: string) => {
     onSelectFrame(frameId);
     const frameName = FRAME_STYLES.find((item) => item.id === frameId)?.name ?? "Frame";
+    if (frameId === FUJI_FRAME_ID) {
+      onStatusChange("Fuji Instant selected. Jumping to print preview.");
+      onNext();
+      return;
+    }
     onStatusChange(
       frameId === selectedFrameId
         ? `${frameName} frame selected.`

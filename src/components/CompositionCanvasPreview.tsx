@@ -11,8 +11,8 @@ type CompositionCanvasPreviewProps = {
   layout: LayoutTemplate;
   shots: BoothShot[];
   frame: FrameStyle;
-  frames: FrameStyle[];
-  selectedFrameId: string;
+  frames?: FrameStyle[];
+  selectedFrameId?: string;
   captionText: string;
   watermarkEnabled: boolean;
   onSwipeFrame?: (direction: SwipeDirection) => void;
@@ -46,10 +46,19 @@ export const CompositionCanvasPreview = ({
   const [isRendering, setIsRendering] = useState(false);
   const [isSwipeActive, setIsSwipeActive] = useState(false);
 
+  const frameList = useMemo(() => {
+    if (frames && frames.length > 0) {
+      return frames;
+    }
+    return [frame];
+  }, [frame, frames]);
+
+  const resolvedFrameId = selectedFrameId ?? frame.id;
+
   const frameIndex = useMemo(() => {
-    const index = frames.findIndex((item) => item.id === selectedFrameId);
+    const index = frameList.findIndex((item) => item.id === resolvedFrameId);
     return index < 0 ? 0 : index;
-  }, [frames, selectedFrameId]);
+  }, [frameList, resolvedFrameId]);
 
   const previewSize = useMemo(() => {
     const { width, height } = layout.exportSize;
@@ -202,19 +211,19 @@ export const CompositionCanvasPreview = ({
         onPointerCancel={handlePointerCancel}
       >
         <canvas ref={canvasRef} className="preview-canvas" />
-        {onSwipeFrame && (
+        {onSwipeFrame && frameList.length > 1 ? (
           <div className={`preview-swipe-hint ${isSwipeActive ? "is-active" : ""}`} aria-hidden="true">
             <span className="preview-swipe-arrow" aria-hidden="true">
               ‹
             </span>
             <span className="preview-swipe-text">
-              {frames[frameIndex]?.name ?? frame.name}
+              {frameList[frameIndex]?.name ?? frame.name}
             </span>
             <span className="preview-swipe-arrow" aria-hidden="true">
               ›
             </span>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

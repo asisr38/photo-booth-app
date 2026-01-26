@@ -22,6 +22,8 @@ export type FrameStyle = {
   shadowStrength: number;
 };
 
+export const FUJI_FRAME_ID = "fuji-instant";
+
 export const FRAME_STYLES: FrameStyle[] = [
   {
     id: "minimal-pop",
@@ -77,6 +79,17 @@ export const FRAME_STYLES: FrameStyle[] = [
     borderColor: "#e9e9ee",
     overlayKind: "ribbon",
     shadowStrength: 0.09,
+  },
+  {
+    id: FUJI_FRAME_ID,
+    name: "Fuji Instant",
+    description: "Classic instant film look with a mint edge.",
+    borderWidthRatio: 0.032,
+    cornerRadiusRatio: 0.038,
+    backgroundColor: "#f9f9f4",
+    borderColor: "#7ddad0",
+    overlayKind: "none",
+    shadowStrength: 0.12,
   },
   {
     id: "sticker",

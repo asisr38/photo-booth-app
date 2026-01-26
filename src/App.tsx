@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { StepperHeader } from "./components/StepperHeader";
-import { getFrameById } from "./lib/frames";
+import { FUJI_FRAME_ID, getFrameById } from "./lib/frames";
 import { getLayoutById } from "./lib/layouts";
 import { CaptureStep } from "./screens/CaptureStep";
 import { ExportStep } from "./screens/ExportStep";
@@ -100,6 +100,11 @@ const AppShell = () => {
   };
 
   const handleCaptureComplete = () => {
+    if (state.selectedFrameId === FUJI_FRAME_ID) {
+      setStatus("Fuji Instant selected. Jumping to print preview.");
+      actions.setStep("export");
+      return;
+    }
     setStatus("All shots captured. Review and retake if needed.");
   };
 
