@@ -9,7 +9,11 @@ export type FrameOverlayKind =
   | "gold"
   | "vintage"
   | "party"
-  | "hearts";
+  | "hearts"
+  | "film-strip"
+  | "cat-whiskers"
+  | "heart-chain"
+  | "grid-glow";
 
 export type FrameStyle = {
   id: string;
@@ -93,6 +97,28 @@ export const FRAME_STYLES: FrameStyle[] = [
     shadowStrength: 0.12,
   },
   {
+    id: "cine-reel",
+    name: "Cine Reel",
+    description: "Modern 35mm-inspired strip with sprocket accents.",
+    borderWidthRatio: 0.032,
+    cornerRadiusRatio: 0.03,
+    backgroundColor: "#11131d",
+    borderColor: "#f0f4ff",
+    overlayKind: "film-strip",
+    shadowStrength: 0.16,
+  },
+  {
+    id: "silver-screen",
+    name: "Silver Screen",
+    description: "Clean monochrome reel style for editorial portraits.",
+    borderWidthRatio: 0.028,
+    cornerRadiusRatio: 0.04,
+    backgroundColor: "#f9fbff",
+    borderColor: "#5f6f8c",
+    overlayKind: "film-strip",
+    shadowStrength: 0.1,
+  },
+  {
     id: "valentine",
     name: "Valentine",
     description: "Rosy blush border with floating hearts.",
@@ -104,6 +130,17 @@ export const FRAME_STYLES: FrameStyle[] = [
     shadowStrength: 0.11,
   },
   {
+    id: "heart-pop",
+    name: "Heart Pop",
+    description: "Contemporary candy-heart pattern with a bold rim.",
+    borderWidthRatio: 0.028,
+    cornerRadiusRatio: 0.08,
+    backgroundColor: "#fff3f8",
+    borderColor: "#ff5f8f",
+    overlayKind: "heart-chain",
+    shadowStrength: 0.12,
+  },
+  {
     id: "love-letter",
     name: "Love Letter",
     description: "Soft ivory with romantic heart accents.",
@@ -113,6 +150,39 @@ export const FRAME_STYLES: FrameStyle[] = [
     borderColor: "#ffb4c8",
     overlayKind: "hearts",
     shadowStrength: 0.1,
+  },
+  {
+    id: "heart-link",
+    name: "Heart Link",
+    description: "Linked mini-hearts around the border for a soft kawaii vibe.",
+    borderWidthRatio: 0.022,
+    cornerRadiusRatio: 0.075,
+    backgroundColor: "#fff8fb",
+    borderColor: "#ff9aba",
+    overlayKind: "heart-chain",
+    shadowStrength: 0.11,
+  },
+  {
+    id: "cat-cafe",
+    name: "Cat Cafe",
+    description: "Cute cat-ear top corners with whisker line accents.",
+    borderWidthRatio: 0.026,
+    cornerRadiusRatio: 0.085,
+    backgroundColor: "#fff7ef",
+    borderColor: "#d4a373",
+    overlayKind: "cat-whiskers",
+    shadowStrength: 0.12,
+  },
+  {
+    id: "kitty-neon",
+    name: "Kitty Neon",
+    description: "Dark playful cat frame with modern cyan glow strokes.",
+    borderWidthRatio: 0.024,
+    cornerRadiusRatio: 0.09,
+    backgroundColor: "#111425",
+    borderColor: "#8fe8ff",
+    overlayKind: "cat-whiskers",
+    shadowStrength: 0.18,
   },
   {
     id: "sticker",
@@ -135,6 +205,17 @@ export const FRAME_STYLES: FrameStyle[] = [
     borderColor: "#8af5ff",
     overlayKind: "neon",
     shadowStrength: 0.2,
+  },
+  {
+    id: "grid-glow",
+    name: "Grid Glow",
+    description: "Y2K-inspired chrome edge with a subtle glowing grid.",
+    borderWidthRatio: 0.024,
+    cornerRadiusRatio: 0.07,
+    backgroundColor: "#ecf4ff",
+    borderColor: "#7aa7ff",
+    overlayKind: "grid-glow",
+    shadowStrength: 0.14,
   },
 ];
 

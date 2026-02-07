@@ -404,6 +404,249 @@ const drawHeartsOverlay = (ctx: CanvasRenderingContext2D, rect: Rect) => {
   ctx.globalAlpha = 1;
 };
 
+const drawFilmStripOverlay = (
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  radius: number,
+  borderWidth: number
+) => {
+  const stripHeight = Math.max(borderWidth * 0.95, rect.h * 0.052);
+  const holeInset = Math.max(4, borderWidth * 0.35);
+  const holeWidth = Math.max(5, borderWidth * 0.42);
+  const holeHeight = Math.max(4, stripHeight * 0.44);
+  const holeRadius = Math.max(2, holeHeight * 0.26);
+  const holeCount = Math.max(8, Math.floor((rect.w - holeInset * 2) / (holeWidth * 1.8)));
+  const spacing = holeCount > 1 ? (rect.w - holeInset * 2 - holeWidth) / (holeCount - 1) : 0;
+
+  ctx.save();
+  drawRoundedRectPath(ctx, rect, radius);
+  ctx.clip();
+
+  ctx.fillStyle = "rgba(8, 12, 25, 0.45)";
+  ctx.fillRect(rect.x, rect.y, rect.w, stripHeight);
+  ctx.fillRect(rect.x, rect.y + rect.h - stripHeight, rect.w, stripHeight);
+
+  ctx.fillStyle = "rgba(242, 246, 255, 0.9)";
+  for (let i = 0; i < holeCount; i += 1) {
+    const x = rect.x + holeInset + i * spacing;
+    addRoundedRectPath(
+      ctx,
+      {
+        x,
+        y: rect.y + (stripHeight - holeHeight) / 2,
+        w: holeWidth,
+        h: holeHeight,
+      },
+      holeRadius
+    );
+    ctx.fill();
+
+    addRoundedRectPath(
+      ctx,
+      {
+        x,
+        y: rect.y + rect.h - stripHeight + (stripHeight - holeHeight) / 2,
+        w: holeWidth,
+        h: holeHeight,
+      },
+      holeRadius
+    );
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = "rgba(242, 246, 255, 0.26)";
+  ctx.lineWidth = Math.max(1.5, borderWidth * 0.11);
+  ctx.beginPath();
+  ctx.moveTo(rect.x + borderWidth * 0.7, rect.y + stripHeight);
+  ctx.lineTo(rect.x + rect.w - borderWidth * 0.7, rect.y + stripHeight);
+  ctx.moveTo(rect.x + borderWidth * 0.7, rect.y + rect.h - stripHeight);
+  ctx.lineTo(rect.x + rect.w - borderWidth * 0.7, rect.y + rect.h - stripHeight);
+  ctx.stroke();
+
+  ctx.restore();
+};
+
+const drawCatOverlay = (
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  radius: number,
+  borderWidth: number,
+  borderColor: string
+) => {
+  const earBase = Math.max(borderWidth * 2.05, rect.w * 0.12);
+  const earHeight = earBase * 0.82;
+  const leftEarX = rect.x + rect.w * 0.24;
+  const rightEarX = rect.x + rect.w * 0.76;
+  const earY = rect.y + borderWidth * 0.42;
+  const whiskerY = rect.y + rect.h - borderWidth * 1.25;
+  const noseY = whiskerY - borderWidth * 0.28;
+  const whiskerHalf = rect.w * 0.17;
+
+  ctx.save();
+  drawRoundedRectPath(ctx, rect, radius);
+  ctx.clip();
+
+  const drawEar = (x: number) => {
+    ctx.save();
+    ctx.translate(x, earY);
+    ctx.fillStyle = borderColor;
+    ctx.beginPath();
+    ctx.moveTo(0, earHeight);
+    ctx.lineTo(-earBase / 2, 0);
+    ctx.lineTo(earBase / 2, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255, 214, 228, 0.84)";
+    ctx.beginPath();
+    ctx.moveTo(0, earHeight * 0.72);
+    ctx.lineTo(-earBase * 0.22, earHeight * 0.2);
+    ctx.lineTo(earBase * 0.22, earHeight * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  drawEar(leftEarX);
+  drawEar(rightEarX);
+
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = Math.max(2, borderWidth * 0.12);
+  ctx.lineCap = "round";
+
+  const drawWhiskers = (centerX: number, direction: -1 | 1) => {
+    const offsets = [-borderWidth * 0.35, 0, borderWidth * 0.35];
+    offsets.forEach((offset) => {
+      ctx.beginPath();
+      ctx.moveTo(centerX, whiskerY + offset);
+      ctx.lineTo(centerX + whiskerHalf * direction, whiskerY + offset + direction * borderWidth * 0.06);
+      ctx.stroke();
+    });
+  };
+
+  drawWhiskers(rect.x + rect.w * 0.42, -1);
+  drawWhiskers(rect.x + rect.w * 0.58, 1);
+
+  ctx.fillStyle = "rgba(255, 160, 182, 0.95)";
+  ctx.beginPath();
+  ctx.moveTo(rect.x + rect.w / 2, noseY + borderWidth * 0.18);
+  ctx.lineTo(rect.x + rect.w / 2 - borderWidth * 0.24, noseY - borderWidth * 0.14);
+  ctx.lineTo(rect.x + rect.w / 2 + borderWidth * 0.24, noseY - borderWidth * 0.14);
+  ctx.closePath();
+  ctx.fill();
+
+  const pawDots = [
+    { x: rect.x + rect.w * 0.12, y: rect.y + rect.h * 0.16 },
+    { x: rect.x + rect.w * 0.9, y: rect.y + rect.h * 0.22 },
+    { x: rect.x + rect.w * 0.16, y: rect.y + rect.h * 0.84 },
+    { x: rect.x + rect.w * 0.84, y: rect.y + rect.h * 0.86 },
+  ];
+  ctx.fillStyle = "rgba(255, 255, 255, 0.52)";
+  pawDots.forEach((dot) => {
+    const size = borderWidth * 0.14;
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, size, 0, Math.PI * 2);
+    ctx.arc(dot.x - size * 1.5, dot.y - size * 1.2, size * 0.52, 0, Math.PI * 2);
+    ctx.arc(dot.x - size * 0.4, dot.y - size * 1.65, size * 0.48, 0, Math.PI * 2);
+    ctx.arc(dot.x + size * 0.7, dot.y - size * 1.55, size * 0.46, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+};
+
+const drawHeartChainOverlay = (
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  radius: number,
+  borderWidth: number
+) => {
+  const size = Math.max(rect.w * 0.024, borderWidth * 0.42);
+  const topY = rect.y + borderWidth * 0.42;
+  const bottomY = rect.y + rect.h - borderWidth * 1.25;
+  const sideInset = borderWidth * 0.85;
+  const count = Math.max(8, Math.floor((rect.w - sideInset * 2) / (size * 1.95)));
+  const spacing = count > 1 ? (rect.w - sideInset * 2) / (count - 1) : 0;
+  const colors = ["#ff8db4", "#ffb0c8", "#ffc2d6"];
+
+  ctx.save();
+  drawRoundedRectPath(ctx, rect, radius);
+  ctx.clip();
+
+  for (let i = 0; i < count; i += 1) {
+    const x = rect.x + sideInset + spacing * i;
+    const color = colors[i % colors.length];
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.9;
+    drawHeartPath(ctx, x, topY, size);
+    ctx.fill();
+    drawHeartPath(ctx, x, bottomY, size);
+    ctx.fill();
+  }
+
+  ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.lineWidth = Math.max(1.2, borderWidth * 0.07);
+  ctx.beginPath();
+  ctx.moveTo(rect.x + sideInset, topY + size * 0.32);
+  ctx.lineTo(rect.x + rect.w - sideInset, topY + size * 0.32);
+  ctx.moveTo(rect.x + sideInset, bottomY + size * 0.32);
+  ctx.lineTo(rect.x + rect.w - sideInset, bottomY + size * 0.32);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+};
+
+const drawGridGlowOverlay = (
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  radius: number,
+  borderWidth: number,
+  borderColor: string
+) => {
+  const spacing = Math.max(12, rect.w * 0.06);
+  const innerRect = {
+    x: rect.x + borderWidth * 0.7,
+    y: rect.y + borderWidth * 0.7,
+    w: rect.w - borderWidth * 1.4,
+    h: rect.h - borderWidth * 1.4,
+  };
+
+  ctx.save();
+  drawRoundedRectPath(ctx, rect, radius);
+  ctx.clip();
+
+  const glow = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+  glow.addColorStop(0, "rgba(90, 200, 255, 0.26)");
+  glow.addColorStop(0.5, "rgba(122, 167, 255, 0.12)");
+  glow.addColorStop(1, "rgba(255, 123, 176, 0.22)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+  ctx.strokeStyle = "rgba(122, 167, 255, 0.26)";
+  ctx.lineWidth = Math.max(1, borderWidth * 0.055);
+  for (let x = innerRect.x; x <= innerRect.x + innerRect.w; x += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(x, innerRect.y);
+    ctx.lineTo(x, innerRect.y + innerRect.h);
+    ctx.stroke();
+  }
+  for (let y = innerRect.y; y <= innerRect.y + innerRect.h; y += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(innerRect.x, y);
+    ctx.lineTo(innerRect.x + innerRect.w, y);
+    ctx.stroke();
+  }
+
+  ctx.shadowColor = borderColor;
+  ctx.shadowBlur = borderWidth * 1.9;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
+  ctx.lineWidth = Math.max(2, borderWidth * 0.24);
+  drawRoundedRectPath(ctx, innerRect, Math.max(6, radius - borderWidth));
+  ctx.stroke();
+  ctx.restore();
+};
+
 const drawNeonOverlay = (
   ctx: CanvasRenderingContext2D,
   rect: Rect,
@@ -536,12 +779,23 @@ export const renderComposition = async ({
   drawRoundedRectPath(ctx, contentRect, innerRadius);
   ctx.clip();
 
-  const shadeColor = frame.overlayKind === "neon" ? "#06070f" : "#0f172a";
+  const shadeColor =
+    frame.overlayKind === "neon" || frame.overlayKind === "film-strip"
+      ? "#06070f"
+      : frame.overlayKind === "grid-glow"
+        ? "#0a1a3a"
+        : "#0f172a";
   const shadeAlpha =
     frame.overlayKind === "neon"
       ? 0.42
+      : frame.overlayKind === "film-strip"
+        ? 0.16
+        : frame.overlayKind === "grid-glow"
+          ? 0.12
       : frame.overlayKind === "bubbles" || frame.overlayKind === "sparkle"
         ? 0.04
+        : frame.overlayKind === "cat-whiskers" || frame.overlayKind === "heart-chain"
+          ? 0.03
         : 0.06;
   ctx.fillStyle = shadeColor;
   ctx.globalAlpha = shadeAlpha;
@@ -608,6 +862,14 @@ export const renderComposition = async ({
     drawStickerOverlay(ctx, outerRect, radius, borderWidth);
   } else if (frame.overlayKind === "hearts") {
     drawHeartsOverlay(ctx, outerRect);
+  } else if (frame.overlayKind === "film-strip") {
+    drawFilmStripOverlay(ctx, outerRect, radius, borderWidth);
+  } else if (frame.overlayKind === "cat-whiskers") {
+    drawCatOverlay(ctx, outerRect, radius, borderWidth, frame.borderColor);
+  } else if (frame.overlayKind === "heart-chain") {
+    drawHeartChainOverlay(ctx, outerRect, radius, borderWidth);
+  } else if (frame.overlayKind === "grid-glow") {
+    drawGridGlowOverlay(ctx, outerRect, radius, borderWidth, frame.borderColor);
   } else if (frame.overlayKind === "neon") {
     drawNeonOverlay(ctx, outerRect, radius, borderWidth, frame.borderColor);
   }

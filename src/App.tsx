@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { StepperHeader } from "./components/StepperHeader";
-import logoIcon from "./assets/logo/papersnap-icon.png";
-import logoMain from "./assets/logo/papersnap-main.png";
 import { FUJI_FRAME_ID, getFrameById } from "./lib/frames";
 import { getLayoutById } from "./lib/layouts";
 import { CaptureStep } from "./screens/CaptureStep";
@@ -10,21 +8,59 @@ import { FrameStep } from "./screens/FrameStep";
 import { LayoutStep } from "./screens/LayoutStep";
 import { BoothProvider, type BoothStep, useBoothStore } from "./store/useBoothStore";
 
+const STEP_ORDER: BoothStep[] = ["layout", "capture", "frame", "export"];
+
+type ViewTransitionCapableDocument = Document & {
+  startViewTransition?: (update: () => void) => {
+    finished: Promise<void>;
+  };
+};
+
+const getStepIndex = (step: BoothStep): number => {
+  const index = STEP_ORDER.indexOf(step);
+  return index >= 0 ? index : 0;
+};
+
 const AppShell = () => {
   const { state, derived, actions } = useBoothStore();
   const [status, setStatus] = useState("");
+  const [transitionDirection, setTransitionDirection] = useState<"forward" | "backward">(
+    "forward"
+  );
 
   const layout = derived.layout;
   const frame = useMemo(() => getFrameById(state.selectedFrameId), [state.selectedFrameId]);
 
+  const setStepWithTransition = (nextStep: BoothStep) => {
+    const currentIndex = getStepIndex(state.step);
+    const nextIndex = getStepIndex(nextStep);
+    setTransitionDirection(nextIndex >= currentIndex ? "forward" : "backward");
+
+    const commitStep = () => {
+      actions.setStep(nextStep);
+    };
+
+    if (typeof document !== "undefined") {
+      const viewTransitionDocument = document as ViewTransitionCapableDocument;
+      if (typeof viewTransitionDocument.startViewTransition === "function") {
+        viewTransitionDocument.startViewTransition(() => {
+          commitStep();
+        });
+        return;
+      }
+    }
+
+    commitStep();
+  };
+
   useEffect(() => {
     if (state.step === "frame" || state.step === "export") {
       if (!derived.isCaptureComplete) {
-        actions.setStep("capture");
+        setStepWithTransition("capture");
         setStatus("Capture all required slots to continue.");
       }
     }
-  }, [actions, derived.isCaptureComplete, state.step]);
+  }, [derived.isCaptureComplete, state.step]);
 
   const canNavigateTo = (step: BoothStep): boolean => {
     if (step === "layout") {
@@ -49,7 +85,7 @@ const AppShell = () => {
       }
       return;
     }
-    actions.setStep(step);
+    setStepWithTransition(step);
     if (!options?.preserveStatus) {
       setStatus("");
     }
@@ -104,7 +140,7 @@ const AppShell = () => {
   const handleCaptureComplete = () => {
     if (state.selectedFrameId === FUJI_FRAME_ID) {
       setStatus("Fuji Instant selected. Jumping to print preview.");
-      actions.setStep("export");
+      setStepWithTransition("export");
       return;
     }
     setStatus("All shots captured. Review and retake if needed.");
@@ -113,21 +149,14 @@ const AppShell = () => {
   const handleStartOver = () => {
     actions.resetAll();
     setStatus("Reset complete. Choose a layout to begin again.");
-    actions.setStep("layout");
+    setStepWithTransition("layout");
   };
 
   return (
     <div className="app-shell">
       <header className="hero">
         <div className="brand">
-          <div className="brand-logo-group">
-            <img src={logoMain} alt="PaperSnap Photo Booth" className="brand-logo-main" />
-            <span className="brand-mark" aria-hidden="true">
-              <img src={logoIcon} alt="" />
-            </span>
-            <h1 className="brand-title">PaperSnap</h1>
-          </div>
-          <p className="brand-tagline">Classy mobile photo booth.</p>
+          <h1 className="brand-title">PaperSnap</h1>
         </div>
         <div className="status" role="status" aria-live="polite">
           {status}
@@ -136,7 +165,10 @@ const AppShell = () => {
 
       <StepperHeader currentStep={state.step} />
 
-      <main className="wizard">
+      <main
+        className={`wizard wizard-transition-${transitionDirection}`}
+        data-step={state.step}
+      >
         {state.step === "layout" && (
           <LayoutStep
             selectedLayoutId={state.layoutId}

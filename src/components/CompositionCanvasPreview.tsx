@@ -197,7 +197,11 @@ export const CompositionCanvasPreview = ({
       <div className="panel-header">
         <div>
           <h2>Preview</h2>
-          <p>Live render of your final composition.</p>
+          <p>
+            {onSwipeFrame
+              ? "Live render. Swipe left or right to browse frames."
+              : "Live render of your final composition."}
+          </p>
         </div>
         {isRendering && <span className="preview-badge">Rendering...</span>}
       </div>

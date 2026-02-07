@@ -12,8 +12,11 @@ export const FramePicker = ({ frames, selectedFrameId, onSelect }: FramePickerPr
       <div className="panel-header">
         <div>
           <h2 id="frameTitle">Frame</h2>
-          <p>Pick a finish that matches the moment.</p>
+          <p>Pick a finish that matches the moment. Swipe on mobile, tap on desktop.</p>
         </div>
+        <span className="frame-count" aria-label={`${frames.length} frame styles available`}>
+          {frames.length} styles
+        </span>
       </div>
 
       <div className="frame-grid" role="listbox" aria-label="Frame styles">
