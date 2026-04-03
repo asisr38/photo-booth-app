@@ -14,6 +14,7 @@ type CompositionCanvasPreviewProps = {
   frames?: FrameStyle[];
   selectedFrameId?: string;
   captionText: string;
+  captionAlign?: "left" | "center" | "right";
   watermarkEnabled: boolean;
   onSwipeFrame?: (direction: SwipeDirection) => void;
   maxPreviewSize?: number;
@@ -37,6 +38,7 @@ export const CompositionCanvasPreview = ({
   frames,
   selectedFrameId,
   captionText,
+  captionAlign = "center",
   watermarkEnabled,
   onSwipeFrame,
   maxPreviewSize = 440,
@@ -101,6 +103,7 @@ export const CompositionCanvasPreview = ({
           shots,
           frame,
           captionText,
+          captionAlign,
           watermarkEnabled,
         });
       } finally {
@@ -115,7 +118,7 @@ export const CompositionCanvasPreview = ({
     return () => {
       cancelled = true;
     };
-  }, [captionText, frame, layout, previewSize.height, previewSize.width, shots, watermarkEnabled]);
+  }, [captionAlign, captionText, frame, layout, previewSize.height, previewSize.width, shots, watermarkEnabled]);
 
   const resetSwipe = useCallback((target: HTMLDivElement | null, pointerId?: number) => {
     if (target && pointerId !== undefined && target.hasPointerCapture?.(pointerId)) {

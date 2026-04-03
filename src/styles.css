@@ -1724,3 +1724,593 @@ a {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Status message types ─────────────────────────────────────── */
+.status--warning {
+  color: #7c4a00;
+  background: rgba(255, 220, 140, 0.88);
+  border-color: rgba(255, 180, 60, 0.6);
+}
+
+.status--error {
+  color: #6b1a2a;
+  background: rgba(255, 180, 190, 0.88);
+  border-color: rgba(255, 100, 120, 0.6);
+}
+
+/* ── Capture step layout — always show slot strip ─────────────── */
+.step-grid-capture {
+  grid-template-columns: 1fr;
+}
+
+/* ── Slot strip improvements ──────────────────────────────────── */
+.slot-card.is-empty .slot-preview {
+  opacity: 0.6;
+}
+
+.slot-placeholder {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slot-placeholder-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink-muted);
+}
+
+.slot-placeholder-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Retake confirmation inline */
+.retake-confirm-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.retake-confirm-inline span {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.slot-confirm-row {
+  display: flex;
+  gap: 6px;
+}
+
+.slot-confirm-cancel,
+.slot-confirm-ok {
+  border: 1px solid rgba(74, 88, 140, 0.24);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  padding: 5px 9px;
+  min-height: 36px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.slot-confirm-ok {
+  background: rgba(255, 200, 215, 0.88);
+  border-color: rgba(255, 100, 140, 0.4);
+  color: var(--accent-ink);
+}
+
+.slot-confirm-ok:hover {
+  background: rgba(255, 160, 190, 0.9);
+}
+
+/* ── Button variants ──────────────────────────────────────────── */
+.btn.danger {
+  background: linear-gradient(145deg, #ffc0c8, #ff7b9c);
+  border-color: rgba(200, 60, 90, 0.4);
+  color: #5a0a1e;
+}
+
+.btn-sm {
+  padding: 7px 12px;
+  min-height: 36px;
+  font-size: 0.84rem;
+}
+
+/* ── Stepper — navigable completed steps ─────────────────────── */
+.stepper-item.is-navigable {
+  cursor: pointer;
+}
+
+.stepper-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 12px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+}
+
+.stepper-btn:hover .stepper-dot {
+  transform: scale(1.15);
+  border-color: rgba(90, 200, 255, 1);
+}
+
+/* ── Camera — upload button ──────────────────────────────────── */
+.camera-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.camera-upload-btn {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 88, 140, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.14s ease;
+}
+
+.camera-upload-btn:hover {
+  border-color: rgba(74, 88, 140, 0.46);
+  background: #ffffff;
+  transform: scale(1.06);
+}
+
+.camera-upload-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+/* Countdown cancel hint */
+.camera-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.camera-countdown-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Frame picker — custom frame support ─────────────────────── */
+.frame-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.frame-create-btn {
+  white-space: nowrap;
+}
+
+.frame-card-wrap {
+  position: relative;
+  flex: 0 0 180px;
+  scroll-snap-align: start;
+}
+
+.frame-card-wrap .frame-card {
+  flex: none;
+  width: 100%;
+}
+
+.frame-card-wrap.is-active .frame-card {
+  border-color: rgba(255, 123, 176, 0.72);
+  box-shadow:
+    0 0 0 2px rgba(255, 123, 176, 0.16),
+    0 22px 36px rgba(117, 134, 201, 0.2);
+}
+
+.frame-card-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+.frame-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 88, 140, 0.22);
+  background: rgba(255, 255, 255, 0.92);
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: transform 0.14s ease, background-color 0.14s ease;
+}
+
+.frame-action-btn:hover {
+  transform: scale(1.1);
+  background: #fff;
+}
+
+.frame-action-btn--delete:hover {
+  background: rgba(255, 180, 190, 0.9);
+}
+
+.frame-custom-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: rgba(255, 123, 176, 0.18);
+  color: var(--accent-ink);
+  vertical-align: middle;
+}
+
+/* ── Caption alignment controls ──────────────────────────────── */
+.caption-align-field {
+  display: grid;
+  gap: 6px;
+}
+
+.caption-align-group {
+  display: flex;
+  gap: 6px;
+}
+
+.caption-align-btn {
+  flex: 1;
+  padding: 8px;
+  min-height: 40px;
+  border: 1px solid rgba(74, 88, 140, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.caption-align-btn.is-active {
+  background: linear-gradient(145deg, #ffd9ea, var(--accent-strong));
+  border-color: rgba(255, 123, 176, 0.5);
+  color: var(--accent-ink);
+}
+
+/* ── Export panel — print support ────────────────────────────── */
+.print-size-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.print-size-select {
+  flex: 1;
+  border-radius: 12px;
+  border: 1px solid rgba(74, 88, 140, 0.24);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  padding: 8px 12px;
+  min-height: 44px;
+  font-size: 0.94rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.18s ease;
+}
+
+.print-size-select:focus {
+  border-color: rgba(255, 123, 176, 0.68);
+  box-shadow: 0 0 0 3px rgba(255, 123, 176, 0.14);
+}
+
+.btn.print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(145deg, #e8f4ff, #cce8ff);
+  border-color: rgba(90, 140, 200, 0.4);
+  color: #1a3a5c;
+}
+
+.btn.print-btn:hover:not(:disabled) {
+  background: linear-gradient(145deg, #d4ebff, #b8daff);
+}
+
+.export-actions {
+  display: grid;
+  gap: 10px;
+}
+
+/* ── Custom Frame Builder ────────────────────────────────────── */
+.cfb-panel {
+  padding: 20px;
+}
+
+.custom-frame-builder {
+  display: grid;
+  gap: 20px;
+}
+
+.cfb-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.cfb-preview-col {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.cfb-preview-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(74, 88, 140, 0.24);
+  background: linear-gradient(180deg, rgba(255, 246, 251, 0.96), rgba(241, 246, 255, 0.9));
+  padding: 16px;
+  min-width: 200px;
+  min-height: 200px;
+}
+
+.cfb-canvas {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.cfb-rendering-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 123, 176, 0.14);
+  border: 1px solid rgba(255, 123, 176, 0.38);
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.cfb-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cfb-import-label {
+  position: relative;
+  cursor: pointer;
+}
+
+.cfb-import-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+.cfb-controls-col {
+  display: grid;
+  gap: 14px;
+}
+
+.cfb-field {
+  display: grid;
+  gap: 6px;
+}
+
+.cfb-label {
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cfb-val {
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+}
+
+.cfb-input {
+  border-radius: 12px;
+  border: 1px solid rgba(74, 88, 140, 0.24);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  padding: 9px 12px;
+  font-size: 0.96rem;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  width: 100%;
+}
+
+.cfb-input:focus {
+  border-color: rgba(255, 123, 176, 0.68);
+  box-shadow: 0 0 0 3px rgba(255, 123, 176, 0.14);
+}
+
+.cfb-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cfb-field--color {
+  align-items: start;
+}
+
+.cfb-color {
+  width: 44px;
+  height: 44px;
+  border: 2px solid rgba(74, 88, 140, 0.24);
+  border-radius: 10px;
+  padding: 2px;
+  cursor: pointer;
+  background: none;
+}
+
+.cfb-color-val {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-family: monospace;
+}
+
+.cfb-range {
+  width: 100%;
+  accent-color: var(--accent);
+  height: 6px;
+  cursor: pointer;
+}
+
+.cfb-select {
+  border-radius: 12px;
+  border: 1px solid rgba(74, 88, 140, 0.24);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  padding: 9px 12px;
+  font-size: 0.94rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  min-height: 44px;
+}
+
+.cfb-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Desktop enhancements (≥ 768px) ──────────────────────────── */
+@media (min-width: 768px) {
+  .step-grid-capture {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cfb-layout {
+    grid-template-columns: auto 1fr;
+  }
+
+  .cfb-preview-wrap {
+    min-width: 240px;
+  }
+
+  .frame-picker-wrap {
+    display: block;
+  }
+
+  .stepper-label {
+    display: block;
+  }
+
+  .slot-grid {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+
+  .export-actions {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: stretch;
+  }
+}
+
+@media (min-width: 900px) {
+  .step-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .step-frame .step-grid {
+    grid-template-columns: 1fr 380px;
+  }
+
+  .step-export .step-grid {
+    grid-template-columns: 1fr 380px;
+  }
+}
+
+/* ── Print styles ─────────────────────────────────────────────── */
+@media print {
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  .hero,
+  .stepper,
+  .step-actions,
+  .frame-side,
+  .export-panel,
+  .camera-panel,
+  .slot-panel,
+  .intro-panel {
+    display: none !important;
+  }
+
+  .app-shell {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .preview-panel {
+    box-shadow: none;
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  .preview-canvas {
+    max-width: 100%;
+    page-break-inside: avoid;
+    box-shadow: none;
+  }
+}

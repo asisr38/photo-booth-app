@@ -12,7 +12,7 @@ import {
   getLayoutById,
   type LayoutTemplate,
 } from "../lib/layouts";
-import { DEFAULT_FRAME_ID } from "../lib/frames";
+import { DEFAULT_FRAME_ID, FRAME_STYLES, type FrameStyle } from "../lib/frames";
 
 export type BoothStep = "layout" | "capture" | "frame" | "export";
 
@@ -22,6 +22,7 @@ export type BoothShot = {
   width: number;
   height: number;
   capturedAt: number;
+  filterId?: string;
 };
 
 type BoothState = {
@@ -31,9 +32,11 @@ type BoothState = {
   countdownSeconds: 0 | 3 | 5 | 10;
   selectedFrameId: string;
   captionText: string;
+  captionAlign: "left" | "center" | "right";
   watermarkEnabled: boolean;
   mirrorPreview: boolean;
   email: string;
+  customFrames: FrameStyle[];
 };
 
 type PersistedBoothState = Pick<
@@ -42,9 +45,11 @@ type PersistedBoothState = Pick<
   | "countdownSeconds"
   | "selectedFrameId"
   | "captionText"
+  | "captionAlign"
   | "watermarkEnabled"
   | "mirrorPreview"
   | "email"
+  | "customFrames"
 >;
 
 type BoothAction =
@@ -56,9 +61,13 @@ type BoothAction =
   | { type: "RETAKE_ALL" }
   | { type: "SELECT_FRAME"; frameId: string }
   | { type: "SET_CAPTION"; captionText: string }
+  | { type: "SET_CAPTION_ALIGN"; align: "left" | "center" | "right" }
   | { type: "SET_WATERMARK"; enabled: boolean }
   | { type: "SET_MIRROR"; enabled: boolean }
   | { type: "SET_EMAIL"; email: string }
+  | { type: "ADD_CUSTOM_FRAME"; frame: FrameStyle }
+  | { type: "REMOVE_CUSTOM_FRAME"; frameId: string }
+  | { type: "UPDATE_CUSTOM_FRAME"; frame: FrameStyle }
   | { type: "RESET_ALL"; layoutId?: string };
 
 type BoothDerived = {
@@ -68,6 +77,7 @@ type BoothDerived = {
   slotsFilled: number;
   isCaptureComplete: boolean;
   nextEmptySlotIndex: number;
+  allFrames: FrameStyle[];
 };
 
 type BoothStore = {
@@ -84,9 +94,13 @@ type BoothStore = {
     retakeAll: () => void;
     selectFrame: (frameId: string) => void;
     setCaption: (captionText: string) => void;
+    setCaptionAlign: (align: "left" | "center" | "right") => void;
     setWatermark: (enabled: boolean) => void;
     setMirror: (enabled: boolean) => void;
     setEmail: (email: string) => void;
+    addCustomFrame: (frame: FrameStyle) => void;
+    removeCustomFrame: (frameId: string) => void;
+    updateCustomFrame: (frame: FrameStyle) => void;
     resetAll: () => void;
   };
 };
@@ -102,9 +116,11 @@ const defaultState: BoothState = {
   countdownSeconds: 3,
   selectedFrameId: DEFAULT_FRAME_ID,
   captionText: "",
+  captionAlign: "center",
   watermarkEnabled: true,
   mirrorPreview: true,
   email: "",
+  customFrames: [],
 };
 
 const toPersistedState = (state: BoothState): PersistedBoothState => ({
@@ -112,9 +128,11 @@ const toPersistedState = (state: BoothState): PersistedBoothState => ({
   countdownSeconds: state.countdownSeconds,
   selectedFrameId: state.selectedFrameId,
   captionText: state.captionText,
+  captionAlign: state.captionAlign,
   watermarkEnabled: state.watermarkEnabled,
   mirrorPreview: state.mirrorPreview,
   email: state.email,
+  customFrames: state.customFrames,
 });
 
 const fromPersistedState = (parsed: Partial<PersistedBoothState>): BoothState => ({
@@ -122,6 +140,8 @@ const fromPersistedState = (parsed: Partial<PersistedBoothState>): BoothState =>
   ...parsed,
   step: "layout",
   shots: [],
+  captionAlign: parsed.captionAlign ?? "center",
+  customFrames: Array.isArray(parsed.customFrames) ? parsed.customFrames : [],
 });
 
 const getInitialState = (): BoothState => {
@@ -135,7 +155,6 @@ const getInitialState = (): BoothState => {
       return defaultState;
     }
     const parsed = JSON.parse(raw) as Partial<BoothState> & Partial<PersistedBoothState>;
-    // Old versions persisted large data URLs; clear them to avoid quota crashes.
     if (Array.isArray(parsed.shots) && parsed.shots.length > 0) {
       window.localStorage.removeItem(STORAGE_KEY);
     }
@@ -160,6 +179,7 @@ const boothReducer = (state: BoothState, action: BoothAction): BoothState => {
       layoutId: action.layoutId ?? DEFAULT_LAYOUT_ID,
       step: "layout",
       shots: [],
+      customFrames: state.customFrames,
     };
   }
 
@@ -198,12 +218,27 @@ const boothReducer = (state: BoothState, action: BoothAction): BoothState => {
       return { ...state, selectedFrameId: action.frameId };
     case "SET_CAPTION":
       return { ...state, captionText: action.captionText };
+    case "SET_CAPTION_ALIGN":
+      return { ...state, captionAlign: action.align };
     case "SET_WATERMARK":
       return { ...state, watermarkEnabled: action.enabled };
     case "SET_MIRROR":
       return { ...state, mirrorPreview: action.enabled };
     case "SET_EMAIL":
       return { ...state, email: action.email };
+    case "ADD_CUSTOM_FRAME":
+      return { ...state, customFrames: [...state.customFrames, action.frame] };
+    case "REMOVE_CUSTOM_FRAME":
+      return {
+        ...state,
+        customFrames: state.customFrames.filter((f) => f.id !== action.frameId),
+        selectedFrameId: state.selectedFrameId === action.frameId ? DEFAULT_FRAME_ID : state.selectedFrameId,
+      };
+    case "UPDATE_CUSTOM_FRAME":
+      return {
+        ...state,
+        customFrames: state.customFrames.map((f) => f.id === action.frame.id ? action.frame : f),
+      };
     default:
       return state;
   }
@@ -230,17 +265,20 @@ export const BoothProvider = ({ children }: { children: ReactNode }) => {
       slotsFilled,
       isCaptureComplete: slotsFilled >= layout.slotCount,
       nextEmptySlotIndex: nextEmptySlotIndex === -1 ? layout.slotCount - 1 : nextEmptySlotIndex,
+      allFrames: [...FRAME_STYLES, ...state.customFrames],
     };
-  }, [state.layoutId, state.shots]);
+  }, [state.layoutId, state.shots, state.customFrames, FRAME_STYLES]);
 
   const persistedState = useMemo(() => toPersistedState(state), [
     state.captionText,
+    state.captionAlign,
     state.countdownSeconds,
     state.layoutId,
     state.mirrorPreview,
     state.selectedFrameId,
     state.watermarkEnabled,
     state.email,
+    state.customFrames,
   ]);
 
   useEffect(() => {
@@ -250,7 +288,6 @@ export const BoothProvider = ({ children }: { children: ReactNode }) => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedState));
     } catch (error) {
-      // If storage is full, clear the key and retry with the slim payload.
       window.localStorage.removeItem(STORAGE_KEY);
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedState));
@@ -304,6 +341,10 @@ export const BoothProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: "SET_CAPTION", captionText });
   }, []);
 
+  const setCaptionAlign = useCallback((align: "left" | "center" | "right") => {
+    dispatch({ type: "SET_CAPTION_ALIGN", align });
+  }, []);
+
   const setWatermark = useCallback((enabled: boolean) => {
     dispatch({ type: "SET_WATERMARK", enabled });
   }, []);
@@ -314,6 +355,18 @@ export const BoothProvider = ({ children }: { children: ReactNode }) => {
 
   const setEmail = useCallback((email: string) => {
     dispatch({ type: "SET_EMAIL", email });
+  }, []);
+
+  const addCustomFrame = useCallback((frame: FrameStyle) => {
+    dispatch({ type: "ADD_CUSTOM_FRAME", frame });
+  }, []);
+
+  const removeCustomFrame = useCallback((frameId: string) => {
+    dispatch({ type: "REMOVE_CUSTOM_FRAME", frameId });
+  }, []);
+
+  const updateCustomFrame = useCallback((frame: FrameStyle) => {
+    dispatch({ type: "UPDATE_CUSTOM_FRAME", frame });
   }, []);
 
   const resetAll = useCallback(() => {
@@ -335,29 +388,37 @@ export const BoothProvider = ({ children }: { children: ReactNode }) => {
         retakeAll,
         selectFrame,
         setCaption,
+        setCaptionAlign,
         setWatermark,
         setMirror,
         setEmail,
+        addCustomFrame,
+        removeCustomFrame,
+        updateCustomFrame,
         resetAll,
       },
     }),
     [
+      addCustomFrame,
       captureShot,
       derived,
       goBack,
       goNext,
+      removeCustomFrame,
       resetAll,
       retakeAll,
       retakeShot,
       selectFrame,
       selectLayout,
       setCaption,
+      setCaptionAlign,
       setCountdown,
       setEmail,
       setMirror,
       setStep,
       setWatermark,
       state,
+      updateCustomFrame,
     ]
   );
 

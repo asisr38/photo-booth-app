@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 type CapturePayload = {
   dataUrl: string;
   width: number;
   height: number;
+  filterId?: string;
 };
 
 type CountdownSeconds = 0 | 3 | 5 | 10;
@@ -51,7 +52,14 @@ const cameraFilters: CameraFilter[] = [
   { id: "cool", label: "Cool", cssFilter: "saturate(1.05) hue-rotate(335deg)" },
   { id: "mono", label: "Mono", cssFilter: "grayscale(1) contrast(1.06)" },
   { id: "pop", label: "Pop", cssFilter: "contrast(1.12) saturate(1.18)" },
+  { id: "vivid", label: "Vivid", cssFilter: "contrast(1.08) saturate(1.4) brightness(1.02)" },
+  { id: "fade", label: "Fade", cssFilter: "contrast(0.88) saturate(0.75) brightness(1.08)" },
 ];
+
+export const getFilterCss = (filterId: string): string => {
+  const filter = cameraFilters.find((f) => f.id === filterId);
+  return filter?.cssFilter ?? "none";
+};
 
 const labelForCountdown = (value: CountdownSeconds): string =>
   value === 0 ? "Off" : `${value}s`;
@@ -62,6 +70,20 @@ const getMediaErrorName = (error: unknown): string => {
   }
   return "";
 };
+
+const readFileAsDataUrl = (file: File): Promise<{ dataUrl: string; width: number; height: number }> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => resolve({ dataUrl, width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = dataUrl;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 export const CameraPreview = ({
   activeSlotIndex,
@@ -82,6 +104,7 @@ export const CameraPreview = ({
 }: CameraPreviewProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>("idle");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
@@ -255,7 +278,7 @@ export const CameraPreview = ({
     ctx.drawImage(video, 0, 0, width, height);
     ctx.filter = "none";
     const dataUrl = canvas.toDataURL("image/png", 1);
-    onCaptured({ dataUrl, width, height });
+    onCaptured({ dataUrl, width, height, filterId: selectedFilterId });
     onStatusChange("Captured. You can retake any slot.");
     setIsCapturing(false);
     setCountdownRemaining(null);
@@ -298,6 +321,30 @@ export const CameraPreview = ({
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   }, []);
 
+  const handleCancelCountdown = useCallback(() => {
+    if (countdownRemaining !== null) {
+      setCountdownRemaining(null);
+      setIsCapturing(false);
+      onStatusChange("Countdown cancelled.");
+    }
+  }, [countdownRemaining, onStatusChange]);
+
+  const handleGalleryUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      onStatusChange("Loading image...");
+      const result = await readFileAsDataUrl(file);
+      onCaptured({ dataUrl: result.dataUrl, width: result.width, height: result.height, filterId: "none" });
+      onStatusChange("Image loaded. Review and confirm.");
+    } catch {
+      onStatusChange("Failed to load image. Try another file.");
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [onCaptured, onStatusChange]);
+
   const isLive = cameraState === "live";
   const isDenied = cameraState === "denied";
   const isInsecure = cameraState === "insecure";
@@ -331,31 +378,70 @@ export const CameraPreview = ({
           <h2 id="cameraTitle">Capture</h2>
           <p>Align your subject and capture each slot.</p>
         </div>
-        {showBackButton && onBack ? (
-          <button
-            type="button"
-            className="camera-header-back camera-icon-btn"
-            onClick={onBack}
-            aria-label="Back to layout"
-          >
-            <svg
-              className="camera-icon"
-              viewBox="0 0 24 24"
-              width="22"
-              height="22"
-              aria-hidden="true"
+        <div className="camera-header-actions">
+          {showBackButton && onBack ? (
+            <button
+              type="button"
+              className="camera-header-back camera-icon-btn"
+              onClick={onBack}
+              aria-label="Back to layout"
             >
+              <svg
+                className="camera-icon"
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                aria-hidden="true"
+              >
+                <path
+                  d="M15 18l-6-6 6-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ) : null}
+          <label className="camera-upload-btn camera-icon-btn" title="Upload from gallery" aria-label="Upload photo from gallery">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="camera-upload-input"
+              onChange={handleGalleryUpload}
+              disabled={isPending || isBusy}
+            />
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" className="camera-icon">
               <path
-                d="M15 18l-6-6 6-6"
+                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2.4"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
+              <polyline
+                points="17 8 12 3 7 8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <line
+                x1="12"
+                y1="3"
+                x2="12"
+                y2="15"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </svg>
-          </button>
-        ) : null}
+          </label>
+        </div>
       </div>
 
       <div className={`camera-viewport ${isLive ? "is-live" : ""} ${isPending ? "is-pending" : ""}`}>
@@ -452,9 +538,9 @@ export const CameraPreview = ({
               <button
                 type="button"
                 className={`camera-shutter ${isCapturing ? "is-busy" : ""}`}
-                onClick={handleCapture}
-                disabled={!isLive || isBusy}
-                aria-label="Capture photo"
+                onClick={isCountingDown ? handleCancelCountdown : handleCapture}
+                disabled={!isLive || (isBusy && !isCountingDown)}
+                aria-label={isCountingDown ? "Cancel countdown" : "Capture photo"}
               >
                 <span className="camera-shutter-core" aria-hidden="true"></span>
               </button>
@@ -470,8 +556,9 @@ export const CameraPreview = ({
           </div>
         )}
         {countdownRemaining !== null && countdownRemaining > 0 && (
-          <div className="camera-countdown" aria-live="assertive">
+          <div className="camera-countdown" aria-live="assertive" role="timer">
             {countdownRemaining}
+            <span className="camera-countdown-hint">tap to cancel</span>
           </div>
         )}
       </div>
@@ -509,10 +596,9 @@ export const CameraPreview = ({
                 onChange={(event) => onMirrorChange(event.target.checked)}
                 disabled={isPending || isBusy}
               />
-              <span>Mirror preview</span>
+              <span>Mirror</span>
             </label>
           </div>
-
         </>
       )}
     </section>

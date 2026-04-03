@@ -8,6 +8,8 @@ type StepConfig = {
 
 type StepperHeaderProps = {
   currentStep: BoothStep;
+  completedSteps?: Set<BoothStep>;
+  onNavigate?: (step: BoothStep) => void;
 };
 
 const STEPS: StepConfig[] = [
@@ -17,7 +19,7 @@ const STEPS: StepConfig[] = [
   { id: "export", label: "Export", shortLabel: "Export" },
 ];
 
-export const StepperHeader = ({ currentStep }: StepperHeaderProps) => {
+export const StepperHeader = ({ currentStep, completedSteps, onNavigate }: StepperHeaderProps) => {
   const currentIndex = STEPS.findIndex((step) => step.id === currentStep);
   const safeIndex = Math.max(0, currentIndex);
   const maxIndex = STEPS.length - 1;
@@ -30,20 +32,38 @@ export const StepperHeader = ({ currentStep }: StepperHeaderProps) => {
       </div>
       {STEPS.map((step, index) => {
         const isActive = step.id === currentStep;
-        const isComplete = index < safeIndex;
+        const isComplete = index < safeIndex || completedSteps?.has(step.id);
+        const isNavigable = isComplete && !isActive && onNavigate;
         return (
           <div
             key={step.id}
             className={`stepper-item ${isActive ? "is-active" : ""} ${
               isComplete ? "is-complete" : ""
-            }`}
+            } ${isNavigable ? "is-navigable" : ""}`}
             aria-current={isActive ? "step" : undefined}
             role="listitem"
           >
-            <span className="stepper-dot" aria-hidden="true"></span>
-            <span className="stepper-label" data-full={step.label}>
-              {step.shortLabel}
-            </span>
+            {isNavigable ? (
+              <button
+                type="button"
+                className="stepper-btn"
+                onClick={() => onNavigate(step.id)}
+                aria-label={`Go back to ${step.label}`}
+                title={`Back to ${step.label}`}
+              >
+                <span className="stepper-dot" aria-hidden="true"></span>
+                <span className="stepper-label" data-full={step.label}>
+                  {step.shortLabel}
+                </span>
+              </button>
+            ) : (
+              <>
+                <span className="stepper-dot" aria-hidden="true"></span>
+                <span className="stepper-label" data-full={step.label}>
+                  {step.shortLabel}
+                </span>
+              </>
+            )}
           </div>
         );
       })}

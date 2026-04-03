@@ -9,12 +9,13 @@ type ExportStepProps = {
   shots: BoothShot[];
   frame: FrameStyle;
   captionText: string;
+  captionAlign: "left" | "center" | "right";
   watermarkEnabled: boolean;
   email: string;
   onSetEmail: (email: string) => void;
   onBack: () => void;
   onStartOver: () => void;
-  onStatusChange: (message: string) => void;
+  onStatusChange: (message: string, type?: "info" | "warning" | "error") => void;
 };
 
 export const ExportStep = ({
@@ -22,6 +23,7 @@ export const ExportStep = ({
   shots,
   frame,
   captionText,
+  captionAlign,
   watermarkEnabled,
   email,
   onSetEmail,
@@ -37,6 +39,7 @@ export const ExportStep = ({
           shots={shots}
           frame={frame}
           captionText={captionText}
+          captionAlign={captionAlign}
           watermarkEnabled={watermarkEnabled}
         />
         <ExportPanel
@@ -44,6 +47,7 @@ export const ExportStep = ({
           shots={shots}
           frame={frame}
           captionText={captionText}
+          captionAlign={captionAlign}
           watermarkEnabled={watermarkEnabled}
           email={email}
           onEmailChange={onSetEmail}
@@ -55,7 +59,7 @@ export const ExportStep = ({
       <div className="panel step-actions">
         <div className="step-actions-meta">
           <strong>All set</strong>
-          <span>Download in PNG or JPG.</span>
+          <span>Download PNG, JPG, or print.</span>
         </div>
         <div className="step-actions-buttons">
           <button type="button" className="btn ghost" onClick={onBack}>

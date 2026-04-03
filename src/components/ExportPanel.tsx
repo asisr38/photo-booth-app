@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import logoPlayful from "../assets/logo/papersnap-playful.png";
 import type { FrameStyle } from "../lib/frames";
 import type { LayoutTemplate } from "../lib/layouts";
@@ -7,17 +7,35 @@ import type { BoothShot } from "../store/useBoothStore";
 
 type ExportQuality = "standard" | "high";
 
+type PrintSize = {
+  id: string;
+  label: string;
+  widthIn: number;
+  heightIn: number;
+  dpi: number;
+};
+
 type ExportPanelProps = {
   layout: LayoutTemplate;
   shots: BoothShot[];
   frame: FrameStyle;
   captionText: string;
+  captionAlign: "left" | "center" | "right";
   watermarkEnabled: boolean;
   email: string;
   onEmailChange: (email: string) => void;
   onStartOver: () => void;
-  onStatusChange: (message: string) => void;
+  onStatusChange: (message: string, type?: "info" | "warning" | "error") => void;
 };
+
+const PRINT_SIZES: PrintSize[] = [
+  { id: "layout", label: "Layout default", widthIn: 0, heightIn: 0, dpi: 300 },
+  { id: "2x6", label: '2″ × 6″ strip', widthIn: 2, heightIn: 6, dpi: 300 },
+  { id: "4x6", label: '4″ × 6″ print', widthIn: 4, heightIn: 6, dpi: 300 },
+  { id: "5x7", label: '5″ × 7″ print', widthIn: 5, heightIn: 7, dpi: 300 },
+  { id: "letter", label: "Letter (8.5×11″)", widthIn: 8.5, heightIn: 11, dpi: 200 },
+  { id: "a4", label: "A4 (210×297 mm)", widthIn: 8.27, heightIn: 11.69, dpi: 200 },
+];
 
 const scaleForQuality = (quality: ExportQuality): number => (quality === "high" ? 2 : 1);
 
@@ -36,9 +54,7 @@ const estimateBytes = (width: number, height: number, format: "png" | "jpeg"): n
 
 const isValidEmail = (value: string): boolean => {
   const trimmed = value.trim();
-  if (!trimmed) {
-    return false;
-  }
+  if (!trimmed) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
 };
 
@@ -65,9 +81,7 @@ const supportsDownloadAttribute = (): boolean => {
 };
 
 const isLikelyIos = (): boolean => {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
+  if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   const isAppleDevice = /iPad|iPhone|iPod/.test(ua);
   const isIpadOs = /Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
@@ -75,9 +89,7 @@ const isLikelyIos = (): boolean => {
 };
 
 const getSaveFilePicker = (): SaveFilePicker | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
+  if (typeof window === "undefined") return null;
   const picker = (window as Window & { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
   return picker ?? null;
 };
@@ -92,9 +104,7 @@ const createExportBlob = async (
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, mime, qualityValue)
       );
-      if (blob) {
-        return blob;
-      }
+      if (blob) return blob;
     }
     const dataUrl = canvas.toDataURL(mime, qualityValue);
     if (typeof fetch === "function") {
@@ -102,9 +112,7 @@ const createExportBlob = async (
       return await response.blob();
     }
     const parts = dataUrl.split(",");
-    if (parts.length < 2) {
-      return null;
-    }
+    if (parts.length < 2) return null;
     const header = parts[0] ?? "";
     const data = parts[1] ?? "";
     const isBase64 = /;base64/i.test(header);
@@ -122,12 +130,8 @@ const createExportBlob = async (
 };
 
 const downloadWithAnchor = (blob: Blob, filename: string): boolean => {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  if (!supportsDownloadAttribute() || isLikelyIos()) {
-    return false;
-  }
+  if (typeof window === "undefined") return false;
+  if (!supportsDownloadAttribute() || isLikelyIos()) return false;
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -142,16 +146,10 @@ const downloadWithAnchor = (blob: Blob, filename: string): boolean => {
 };
 
 const tryShareFile = async (blob: Blob, filename: string): Promise<boolean> => {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-  if (!("share" in navigator)) {
-    return false;
-  }
+  if (typeof navigator === "undefined") return false;
+  if (!("share" in navigator)) return false;
   const file = new File([blob], filename, { type: blob.type });
-  if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
-    return false;
-  }
+  if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) return false;
   try {
     await navigator.share({ files: [file], title: filename });
     return true;
@@ -165,6 +163,7 @@ export const ExportPanel = ({
   shots,
   frame,
   captionText,
+  captionAlign,
   watermarkEnabled,
   email,
   onEmailChange,
@@ -173,32 +172,60 @@ export const ExportPanel = ({
 }: ExportPanelProps) => {
   const [quality, setQuality] = useState<ExportQuality>("high");
   const [isExporting, setIsExporting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
+  const [printSizeId, setPrintSizeId] = useState<string>("layout");
+  const printFrameRef = useRef<HTMLIFrameElement | null>(null);
+
+  const printSize = PRINT_SIZES.find((s) => s.id === printSizeId) ?? PRINT_SIZES[0];
 
   const exportMeta = useMemo(() => {
     const scale = scaleForQuality(quality);
+    if (printSizeId !== "layout" && printSize.widthIn > 0) {
+      const pw = Math.round(printSize.widthIn * printSize.dpi * scale);
+      const ph = Math.round(printSize.heightIn * printSize.dpi * scale);
+      return { width: pw, height: ph, scale };
+    }
     const width = layout.exportSize.width * scale;
     const height = layout.exportSize.height * scale;
     return { width, height, scale };
-  }, [layout.exportSize.height, layout.exportSize.width, quality]);
+  }, [layout.exportSize, quality, printSizeId, printSize]);
 
   const emailValid = useMemo(() => isValidEmail(email), [email]);
   const emailError = emailTouched && !emailValid;
   const downloadsLocked = !emailValid;
 
+  const renderToCanvas = async (): Promise<HTMLCanvasElement | null> => {
+    const canvas = document.createElement("canvas");
+    canvas.width = exportMeta.width;
+    canvas.height = exportMeta.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    await renderComposition({
+      ctx,
+      width: exportMeta.width,
+      height: exportMeta.height,
+      layout,
+      shots,
+      frame,
+      captionText,
+      captionAlign,
+      watermarkEnabled,
+    });
+    return canvas;
+  };
+
   const handleDownload = async (format: "png" | "jpeg") => {
-    if (isExporting) {
-      return;
-    }
+    if (isExporting) return;
     if (!emailValid) {
       setEmailTouched(true);
-      onStatusChange("Enter a valid email to unlock free downloads.");
+      onStatusChange("Enter a valid email to unlock free downloads.", "warning");
       return;
     }
     setIsExporting(true);
     onStatusChange(`Rendering ${format.toUpperCase()}...`);
 
-    const filename = `photo-booth-${layout.id}-${quality}.${format === "png" ? "png" : "jpg"}`;
+    const filename = `papersnap-${layout.id}-${quality}.${format === "png" ? "png" : "jpg"}`;
     const mime = format === "png" ? "image/png" : "image/jpeg";
     const extension = format === "png" ? ".png" : ".jpg";
     const picker = getSaveFilePicker();
@@ -211,9 +238,7 @@ export const ExportPanel = ({
           types: [
             {
               description: format === "png" ? "PNG image" : "JPEG image",
-              accept: {
-                [mime]: [extension],
-              },
+              accept: { [mime]: [extension] },
             },
           ],
         });
@@ -223,33 +248,19 @@ export const ExportPanel = ({
       }
     }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = exportMeta.width;
-    canvas.height = exportMeta.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setIsExporting(false);
-      onStatusChange("Export failed. Please try again.");
-      return;
-    }
-
     try {
-      await renderComposition({
-        ctx,
-        width: exportMeta.width,
-        height: exportMeta.height,
-        layout,
-        shots,
-        frame,
-        captionText,
-        watermarkEnabled,
-      });
+      const canvas = await renderToCanvas();
+      if (!canvas) {
+        setIsExporting(false);
+        onStatusChange("Export failed. Please try again.", "error");
+        return;
+      }
 
       const qualityValue = format === "jpeg" ? (quality === "high" ? 0.94 : 0.88) : 1;
       const blob = await createExportBlob(canvas, mime, qualityValue);
       if (!blob) {
         setIsExporting(false);
-        onStatusChange("Export failed. Please try again.");
+        onStatusChange("Export failed. Please try again.", "error");
         return;
       }
 
@@ -295,7 +306,87 @@ export const ExportPanel = ({
       onStatusChange("Image opened. Save or share from the new tab.");
     } catch (error) {
       setIsExporting(false);
-      onStatusChange("Export failed. Please try again.");
+      onStatusChange("Export failed. Please try again.", "error");
+    }
+  };
+
+  const handlePrint = async () => {
+    if (isPrinting) return;
+    if (!emailValid) {
+      setEmailTouched(true);
+      onStatusChange("Enter a valid email to unlock printing.", "warning");
+      return;
+    }
+    setIsPrinting(true);
+    onStatusChange("Preparing print...");
+
+    try {
+      const canvas = await renderToCanvas();
+      if (!canvas) {
+        setIsPrinting(false);
+        onStatusChange("Print failed. Please try again.", "error");
+        return;
+      }
+      const dataUrl = canvas.toDataURL("image/png", 1);
+
+      // Build a minimal print document
+      const printWidthIn = printSize.id !== "layout" && printSize.widthIn > 0 ? printSize.widthIn : undefined;
+      const printHeightIn = printSize.id !== "layout" && printSize.heightIn > 0 ? printSize.heightIn : undefined;
+      const sizeRule = printWidthIn && printHeightIn
+        ? `size: ${printWidthIn}in ${printHeightIn}in;`
+        : "size: auto;";
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PaperSnap Print</title>
+<style>
+  @page { ${sizeRule} margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  img { display: block; max-width: 100%; max-height: 100vh; object-fit: contain; }
+</style>
+</head>
+<body>
+<img src="${dataUrl}" alt="PaperSnap composition" />
+</body>
+</html>`;
+
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.left = "-9999px";
+      iframe.style.top = "0";
+      iframe.style.width = "1px";
+      iframe.style.height = "1px";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
+      printFrameRef.current = iframe;
+
+      const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+      if (!doc) {
+        iframe.remove();
+        setIsPrinting(false);
+        onStatusChange("Print failed. Please try again.", "error");
+        return;
+      }
+
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      iframe.onload = () => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        window.setTimeout(() => {
+          iframe.remove();
+          setIsPrinting(false);
+          onStatusChange("Print dialog opened.");
+        }, 1000);
+      };
+    } catch (error) {
+      setIsPrinting(false);
+      onStatusChange("Print failed. Please try again.", "error");
     }
   };
 
@@ -310,7 +401,7 @@ export const ExportPanel = ({
             <img src={logoPlayful} alt="" className="export-title-mark" aria-hidden="true" />
             <h2 id="exportTitle">Export</h2>
           </div>
-          <p>Download a polished output ready to print.</p>
+          <p>Download or print your photo in full resolution.</p>
         </div>
         <button type="button" className="btn ghost" onClick={onStartOver}>
           Start Over
@@ -337,15 +428,29 @@ export const ExportPanel = ({
           </button>
         </div>
 
+        <div className="print-size-row">
+          <label className="form-label" htmlFor="printSizeSelect">Print size</label>
+          <select
+            id="printSizeSelect"
+            className="print-size-select"
+            value={printSizeId}
+            onChange={(e) => setPrintSizeId(e.target.value)}
+          >
+            {PRINT_SIZES.map((size) => (
+              <option key={size.id} value={size.id}>{size.label}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="export-size">
           <div className="export-size-row">
             <span>Final size</span>
             <strong>
-              {exportMeta.width}x{exportMeta.height}px
+              {exportMeta.width}×{exportMeta.height}px
             </strong>
           </div>
           <div className="export-size-row export-size-subtle">
-            <span>Approx file size</span>
+            <span>Est. file size</span>
             <strong>
               PNG {prettySize(pngEstimate)} / JPG {prettySize(jpgEstimate)}
             </strong>
@@ -383,7 +488,7 @@ export const ExportPanel = ({
           type="button"
           className="btn primary"
           onClick={() => handleDownload("png")}
-          disabled={downloadsLocked || isExporting}
+          disabled={downloadsLocked || isExporting || isPrinting}
         >
           {isExporting ? "Rendering..." : "Download PNG"}
         </button>
@@ -391,9 +496,27 @@ export const ExportPanel = ({
           type="button"
           className="btn ghost"
           onClick={() => handleDownload("jpeg")}
-          disabled={downloadsLocked || isExporting}
+          disabled={downloadsLocked || isExporting || isPrinting}
         >
           Download JPG
+        </button>
+        <button
+          type="button"
+          className="btn print-btn"
+          onClick={handlePrint}
+          disabled={downloadsLocked || isExporting || isPrinting}
+          title="Print this composition"
+        >
+          {isPrinting ? "Preparing..." : (
+            <>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              Print
+            </>
+          )}
         </button>
       </div>
     </section>

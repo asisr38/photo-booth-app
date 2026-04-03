@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { CompositionCanvasPreview } from "../components/CompositionCanvasPreview";
+import { CustomFrameBuilder } from "../components/CustomFrameBuilder";
 import { FramePicker } from "../components/FramePicker";
-import { FRAME_STYLES, FUJI_FRAME_ID, getFrameById } from "../lib/frames";
+import { FUJI_FRAME_ID, getFrameById } from "../lib/frames";
+import type { FrameStyle } from "../lib/frames";
 import type { LayoutTemplate } from "../lib/layouts";
 import type { BoothShot } from "../store/useBoothStore";
 
@@ -8,11 +11,18 @@ type FrameStepProps = {
   layout: LayoutTemplate;
   shots: BoothShot[];
   selectedFrameId: string;
+  allFrames: FrameStyle[];
   captionText: string;
+  captionAlign: "left" | "center" | "right";
   watermarkEnabled: boolean;
+  customFrames: FrameStyle[];
   onSelectFrame: (frameId: string) => void;
   onSetCaption: (captionText: string) => void;
+  onSetCaptionAlign: (align: "left" | "center" | "right") => void;
   onSetWatermark: (enabled: boolean) => void;
+  onAddCustomFrame: (frame: FrameStyle) => void;
+  onRemoveCustomFrame: (frameId: string) => void;
+  onUpdateCustomFrame: (frame: FrameStyle) => void;
   onNext: () => void;
   onBack: () => void;
   onStatusChange: (message: string) => void;
@@ -24,26 +34,37 @@ export const FrameStep = ({
   layout,
   shots,
   selectedFrameId,
+  allFrames,
   captionText,
+  captionAlign,
   watermarkEnabled,
+  customFrames,
   onSelectFrame,
   onSetCaption,
+  onSetCaptionAlign,
   onSetWatermark,
+  onAddCustomFrame,
+  onRemoveCustomFrame,
+  onUpdateCustomFrame,
   onNext,
   onBack,
   onStatusChange,
 }: FrameStepProps) => {
-  const frame = getFrameById(selectedFrameId);
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [editingFrame, setEditingFrame] = useState<FrameStyle | null>(null);
+
+  const frame =
+    allFrames.find((f) => f.id === selectedFrameId) ?? getFrameById(selectedFrameId);
   const isNextEnabled = shots.length >= layout.slotCount;
-  const frameCount = FRAME_STYLES.length;
+  const frameCount = allFrames.length;
   const currentFrameIndex = Math.max(
     0,
-    FRAME_STYLES.findIndex((item) => item.id === selectedFrameId)
+    allFrames.findIndex((item) => item.id === selectedFrameId)
   );
 
   const handleFrameSelect = (frameId: string) => {
     onSelectFrame(frameId);
-    const frameName = FRAME_STYLES.find((item) => item.id === frameId)?.name ?? "Frame";
+    const frameName = allFrames.find((item) => item.id === frameId)?.name ?? "Frame";
     if (frameId === FUJI_FRAME_ID) {
       onStatusChange("Fuji Instant selected. Jumping to print preview.");
       onNext();
@@ -61,17 +82,63 @@ export const FrameStep = ({
   };
 
   const handleFrameSwipe = (direction: "next" | "prev") => {
-    if (frameCount <= 1) {
-      return;
-    }
+    if (frameCount <= 1) return;
     const delta = direction === "next" ? 1 : -1;
     const nextIndex = (currentFrameIndex + delta + frameCount) % frameCount;
-    const nextFrame = FRAME_STYLES[nextIndex];
-    if (!nextFrame || nextFrame.id === selectedFrameId) {
-      return;
-    }
+    const nextFrame = allFrames[nextIndex];
+    if (!nextFrame || nextFrame.id === selectedFrameId) return;
     handleFrameSelect(nextFrame.id);
   };
+
+  const handleSaveCustomFrame = (frame: FrameStyle) => {
+    if (editingFrame) {
+      onUpdateCustomFrame(frame);
+      onStatusChange(`"${frame.name}" updated.`);
+    } else {
+      onAddCustomFrame(frame);
+      onSelectFrame(frame.id);
+      onStatusChange(`"${frame.name}" saved and selected.`);
+    }
+    setBuilderOpen(false);
+    setEditingFrame(null);
+  };
+
+  const handleEditCustomFrame = (frame: FrameStyle) => {
+    setEditingFrame(frame);
+    setBuilderOpen(true);
+  };
+
+  const handleDeleteCustomFrame = (frameId: string) => {
+    onRemoveCustomFrame(frameId);
+    onStatusChange("Custom frame removed.");
+  };
+
+  const handleOpenBuilder = () => {
+    setEditingFrame(null);
+    setBuilderOpen(true);
+  };
+
+  if (builderOpen) {
+    return (
+      <div className="step step-frame" role="tabpanel" aria-labelledby="step-frame">
+        <div className="panel cfb-panel">
+          <div className="panel-header">
+            <div>
+              <h2>{editingFrame ? `Editing "${editingFrame.name}"` : "Custom Frame Builder"}</h2>
+              <p>Design your own frame. Changes preview in real time.</p>
+            </div>
+          </div>
+          <CustomFrameBuilder
+            layout={layout}
+            shots={shots}
+            editingFrame={editingFrame}
+            onSave={handleSaveCustomFrame}
+            onCancel={() => { setBuilderOpen(false); setEditingFrame(null); }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="step step-frame" role="tabpanel" aria-labelledby="step-frame">
@@ -80,15 +147,24 @@ export const FrameStep = ({
           layout={layout}
           shots={shots}
           frame={frame}
-          frames={FRAME_STYLES}
+          frames={allFrames}
           selectedFrameId={selectedFrameId}
           captionText={captionText}
+          captionAlign={captionAlign}
           watermarkEnabled={watermarkEnabled}
           onSwipeFrame={handleFrameSwipe}
         />
         <div className="frame-side">
           <div className="frame-picker-wrap">
-            <FramePicker frames={FRAME_STYLES} selectedFrameId={frame.id} onSelect={handleFrameSelect} />
+            <FramePicker
+              frames={allFrames}
+              selectedFrameId={frame.id}
+              customFrameIds={new Set(customFrames.map((f) => f.id))}
+              onSelect={handleFrameSelect}
+              onEdit={handleEditCustomFrame}
+              onDelete={handleDeleteCustomFrame}
+              onCreateNew={handleOpenBuilder}
+            />
           </div>
           <section className="panel edit-panel" aria-labelledby="editTitle">
             <div className="panel-header">
@@ -109,6 +185,27 @@ export const FrameStep = ({
                 />
                 <span className="form-hint">{captionText.length}/{CAPTION_LIMIT}</span>
               </label>
+
+              {captionText.trim() && (
+                <div className="form-field caption-align-field">
+                  <span className="form-label">Caption alignment</span>
+                  <div className="caption-align-group" role="group" aria-label="Caption alignment">
+                    {(["left", "center", "right"] as const).map((align) => (
+                      <button
+                        key={align}
+                        type="button"
+                        className={`caption-align-btn ${captionAlign === align ? "is-active" : ""}`}
+                        onClick={() => onSetCaptionAlign(align)}
+                        aria-pressed={captionAlign === align}
+                        aria-label={`Align ${align}`}
+                      >
+                        {align === "left" ? "⬅" : align === "center" ? "↔" : "➡"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <label className="toggle-field">
                 <input
                   type="checkbox"

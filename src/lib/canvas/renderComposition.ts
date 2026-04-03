@@ -11,6 +11,7 @@ type RenderOptions = {
   shots: BoothShot[];
   frame: FrameStyle;
   captionText: string;
+  captionAlign?: "left" | "center" | "right";
   watermarkEnabled: boolean;
 };
 
@@ -25,6 +26,20 @@ type Rect = {
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
+
+const FILTER_CSS_MAP: Record<string, string> = {
+  none: "none",
+  soft: "brightness(1.04) saturate(1.05)",
+  warm: "saturate(1.12) sepia(0.18)",
+  cool: "saturate(1.05) hue-rotate(335deg)",
+  mono: "grayscale(1) contrast(1.06)",
+  pop: "contrast(1.12) saturate(1.18)",
+  vivid: "contrast(1.08) saturate(1.4) brightness(1.02)",
+  fade: "contrast(0.88) saturate(0.75) brightness(1.08)",
+};
+
+const getFilterCssById = (filterId: string): string =>
+  FILTER_CSS_MAP[filterId] ?? "none";
 
 const createSeededRandom = (seed = 42) => {
   let value = seed;
@@ -668,7 +683,8 @@ const drawCaption = (
   ctx: CanvasRenderingContext2D,
   outerRect: Rect,
   borderWidth: number,
-  captionText: string
+  captionText: string,
+  captionAlign: "left" | "center" | "right" = "center"
 ) => {
   if (!captionText.trim()) {
     return;
@@ -677,9 +693,16 @@ const drawCaption = (
   ctx.save();
   ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
   ctx.font = `600 ${fontSize}px "Cormorant Garamond", "Times New Roman", serif`;
-  ctx.textAlign = "center";
+  ctx.textAlign = captionAlign;
   ctx.textBaseline = "bottom";
-  ctx.fillText(captionText.trim(), outerRect.x + outerRect.w / 2, outerRect.y + outerRect.h - borderWidth * 1.6);
+  const padding = borderWidth * 1.6;
+  const textX =
+    captionAlign === "left"
+      ? outerRect.x + padding
+      : captionAlign === "right"
+        ? outerRect.x + outerRect.w - padding
+        : outerRect.x + outerRect.w / 2;
+  ctx.fillText(captionText.trim(), textX, outerRect.y + outerRect.h - borderWidth * 1.4);
   ctx.restore();
 };
 
@@ -740,6 +763,7 @@ export const renderComposition = async ({
   shots,
   frame,
   captionText,
+  captionAlign = "center",
   watermarkEnabled,
 }: RenderOptions): Promise<void> => {
   const minDim = Math.min(width, height);
@@ -821,10 +845,19 @@ export const renderComposition = async ({
       return;
     }
     const rect = mapSlotRect(entry.slotRect, contentRect, gap);
+    const shot = shotsBySlot.get(entry.index);
+    const slotFilter = shot?.filterId && shot.filterId !== "none"
+      ? getFilterCssById(shot.filterId)
+      : "none";
+
     ctx.save();
     drawRoundedRectPath(ctx, rect, innerRadius * 0.5);
     ctx.clip();
+    if (slotFilter !== "none") {
+      ctx.filter = slotFilter;
+    }
     drawImageCover(ctx, entry.image, rect);
+    ctx.filter = "none";
     ctx.restore();
 
     ctx.save();
@@ -874,6 +907,6 @@ export const renderComposition = async ({
     drawNeonOverlay(ctx, outerRect, radius, borderWidth, frame.borderColor);
   }
 
-  drawCaption(ctx, outerRect, borderWidth, captionText);
+  drawCaption(ctx, outerRect, borderWidth, captionText, captionAlign);
   await drawWatermark(ctx, outerRect, borderWidth, watermarkEnabled);
 };

@@ -10,6 +10,8 @@ import { BoothProvider, type BoothStep, useBoothStore } from "./store/useBoothSt
 
 const STEP_ORDER: BoothStep[] = ["layout", "capture", "frame", "export"];
 
+type StatusType = "info" | "warning" | "error";
+
 type ViewTransitionCapableDocument = Document & {
   startViewTransition?: (update: () => void) => {
     finished: Promise<void>;
@@ -23,13 +25,22 @@ const getStepIndex = (step: BoothStep): number => {
 
 const AppShell = () => {
   const { state, derived, actions } = useBoothStore();
-  const [status, setStatus] = useState("");
+  const [status, setStatusText] = useState("");
+  const [statusType, setStatusType] = useState<StatusType>("info");
   const [transitionDirection, setTransitionDirection] = useState<"forward" | "backward">(
     "forward"
   );
 
   const layout = derived.layout;
-  const frame = useMemo(() => getFrameById(state.selectedFrameId), [state.selectedFrameId]);
+  const frame = useMemo(
+    () => getFrameById(state.selectedFrameId) ?? derived.allFrames.find((f) => f.id === state.selectedFrameId) ?? getFrameById(null),
+    [state.selectedFrameId, derived.allFrames]
+  );
+
+  const setStatus = (message: string, type: StatusType = "info") => {
+    setStatusText(message);
+    setStatusType(type);
+  };
 
   const setStepWithTransition = (nextStep: BoothStep) => {
     const currentIndex = getStepIndex(state.step);
@@ -57,7 +68,7 @@ const AppShell = () => {
     if (state.step === "frame" || state.step === "export") {
       if (!derived.isCaptureComplete) {
         setStepWithTransition("capture");
-        setStatus("Capture all required slots to continue.");
+        setStatus("Capture all required slots to continue.", "warning");
       }
     }
   }, [derived.isCaptureComplete, state.step]);
@@ -81,7 +92,7 @@ const AppShell = () => {
   const goToStep = (step: BoothStep, options?: { preserveStatus?: boolean }) => {
     if (!canNavigateTo(step)) {
       if (step === "frame" || step === "export") {
-        setStatus("Capture all required slots to unlock the next step.");
+        setStatus("Capture all required slots to unlock the next step.", "warning");
       }
       return;
     }
@@ -91,6 +102,10 @@ const AppShell = () => {
     }
   };
 
+  const handleStepperNavigate = (step: BoothStep) => {
+    goToStep(step);
+  };
+
   const handleNext = () => {
     if (state.step === "layout") {
       goToStep("capture");
@@ -98,7 +113,7 @@ const AppShell = () => {
     }
     if (state.step === "capture") {
       if (!derived.isCaptureComplete) {
-        setStatus("Finish all slots before moving on.");
+        setStatus("Finish all slots before moving on.", "warning");
         return;
       }
       goToStep("frame");
@@ -132,7 +147,7 @@ const AppShell = () => {
 
   const handleCaptureShot = (
     slotIndex: number,
-    payload: { dataUrl: string; width: number; height: number }
+    payload: { dataUrl: string; width: number; height: number; filterId?: string }
   ) => {
     actions.captureShot({ slotIndex, ...payload });
   };
@@ -152,18 +167,39 @@ const AppShell = () => {
     setStepWithTransition("layout");
   };
 
+  const completedSteps = useMemo<Set<BoothStep>>(() => {
+    const steps = new Set<BoothStep>();
+    const currentIndex = getStepIndex(state.step);
+    STEP_ORDER.forEach((step, index) => {
+      if (index < currentIndex) steps.add(step);
+    });
+    return steps;
+  }, [state.step]);
+
   return (
     <div className="app-shell">
       <header className="hero">
         <div className="brand">
           <h1 className="brand-title">PaperSnap</h1>
         </div>
-        <div className="status" role="status" aria-live="polite">
-          {status}
-        </div>
+        {status ? (
+          <div
+            className={`status status--${statusType}`}
+            role="status"
+            aria-live="polite"
+          >
+            {status}
+          </div>
+        ) : (
+          <div className="status" role="status" aria-live="polite" />
+        )}
       </header>
 
-      <StepperHeader currentStep={state.step} />
+      <StepperHeader
+        currentStep={state.step}
+        completedSteps={completedSteps}
+        onNavigate={handleStepperNavigate}
+      />
 
       <main
         className={`wizard wizard-transition-${transitionDirection}`}
@@ -197,7 +233,7 @@ const AppShell = () => {
             onNext={handleNext}
             onCaptureComplete={handleCaptureComplete}
             onBack={handleBack}
-            onStatusChange={setStatus}
+            onStatusChange={(msg) => setStatus(msg)}
           />
         )}
 
@@ -206,14 +242,21 @@ const AppShell = () => {
             layout={layout}
             shots={state.shots}
             selectedFrameId={frame.id}
+            allFrames={derived.allFrames}
             captionText={state.captionText}
+            captionAlign={state.captionAlign}
             watermarkEnabled={state.watermarkEnabled}
+            customFrames={state.customFrames}
             onSelectFrame={actions.selectFrame}
             onSetCaption={actions.setCaption}
+            onSetCaptionAlign={actions.setCaptionAlign}
             onSetWatermark={actions.setWatermark}
+            onAddCustomFrame={actions.addCustomFrame}
+            onRemoveCustomFrame={actions.removeCustomFrame}
+            onUpdateCustomFrame={actions.updateCustomFrame}
             onNext={handleNext}
             onBack={handleBack}
-            onStatusChange={setStatus}
+            onStatusChange={(msg) => setStatus(msg)}
           />
         )}
 
@@ -223,12 +266,13 @@ const AppShell = () => {
             shots={state.shots}
             frame={frame}
             captionText={state.captionText}
+            captionAlign={state.captionAlign}
             watermarkEnabled={state.watermarkEnabled}
             email={state.email}
             onSetEmail={actions.setEmail}
             onBack={handleBack}
             onStartOver={handleStartOver}
-            onStatusChange={setStatus}
+            onStatusChange={(msg, type) => setStatus(msg, type)}
           />
         )}
       </main>
