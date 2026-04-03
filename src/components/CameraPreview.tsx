@@ -105,6 +105,11 @@ export const CameraPreview = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const onStatusChangeRef = useRef(onStatusChange);
+  useEffect(() => { onStatusChangeRef.current = onStatusChange; });
+  const onCapturedRef = useRef(onCaptured);
+  useEffect(() => { onCapturedRef.current = onCaptured; });
+
   const [cameraState, setCameraState] = useState<CameraState>("idle");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
@@ -125,17 +130,17 @@ export const CameraPreview = ({
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState("error");
-      onStatusChange("Camera access is not supported on this browser.");
+      onStatusChangeRef.current("Camera access is not supported on this browser.");
       return;
     }
 
     if (typeof window.isSecureContext === "boolean" && !window.isSecureContext) {
       setCameraState("insecure");
-      onStatusChange("Camera needs HTTPS or localhost. Try the HTTPS dev server.");
+      onStatusChangeRef.current("Camera needs HTTPS or localhost. Try the HTTPS dev server.");
       return;
     }
 
-    onStatusChange("Requesting camera access...");
+    onStatusChangeRef.current("Requesting camera access...");
     setCameraState("requesting");
     stopCamera();
 
@@ -181,31 +186,31 @@ export const CameraPreview = ({
         const name = getMediaErrorName(lastError);
         if (name === "NotAllowedError") {
           setCameraState("denied");
-          onStatusChange("Camera permission was denied. Please allow access and retry.");
+          onStatusChangeRef.current("Camera permission was denied. Please allow access and retry.");
           return;
         }
         if (name === "SecurityError") {
           setCameraState("insecure");
-          onStatusChange("Camera needs HTTPS or localhost. Try the HTTPS dev server.");
+          onStatusChangeRef.current("Camera needs HTTPS or localhost. Try the HTTPS dev server.");
           return;
         }
         if (name === "NotFoundError") {
           setCameraState("error");
-          onStatusChange("No camera was found on this device.");
+          onStatusChangeRef.current("No camera was found on this device.");
           return;
         }
         if (name === "NotReadableError") {
           setCameraState("error");
-          onStatusChange("Camera is already in use. Close other apps and retry.");
+          onStatusChangeRef.current("Camera is already in use. Close other apps and retry.");
           return;
         }
         if (name === "OverconstrainedError") {
           setCameraState("error");
-          onStatusChange("Camera settings are not supported on this device.");
+          onStatusChangeRef.current("Camera settings are not supported on this device.");
           return;
         }
         setCameraState("error");
-        onStatusChange("Camera failed to initialize.");
+        onStatusChangeRef.current("Camera failed to initialize.");
         return;
       }
 
@@ -213,7 +218,7 @@ export const CameraPreview = ({
       const video = videoRef.current;
       if (!video) {
         setCameraState("error");
-        onStatusChange("Camera failed to initialize.");
+        onStatusChangeRef.current("Camera failed to initialize.");
         return;
       }
 
@@ -225,16 +230,16 @@ export const CameraPreview = ({
       } catch (error) {
         stopCamera();
         setCameraState("error");
-        onStatusChange("Camera preview failed to start. Tap enable to retry.");
+        onStatusChangeRef.current("Camera preview failed to start. Tap enable to retry.");
         return;
       }
       setCameraState("live");
-      onStatusChange("");
+      onStatusChangeRef.current("");
     } catch (error) {
       setCameraState("error");
-      onStatusChange("Camera failed to initialize.");
+      onStatusChangeRef.current("Camera failed to initialize.");
     }
-  }, [facingMode, onStatusChange, stopCamera]);
+  }, [facingMode, stopCamera]);
 
   useEffect(() => {
     startCamera();
@@ -244,7 +249,7 @@ export const CameraPreview = ({
   const captureFrame = useCallback(() => {
     const video = videoRef.current;
     if (!video || !streamRef.current || video.readyState < 2) {
-      onStatusChange("Camera is not ready yet.");
+      onStatusChangeRef.current("Camera is not ready yet.");
       setIsCapturing(false);
       return;
     }
@@ -261,7 +266,7 @@ export const CameraPreview = ({
     canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      onStatusChange("Capture failed. Please try again.");
+      onStatusChangeRef.current("Capture failed. Please try again.");
       setIsCapturing(false);
       return;
     }
@@ -278,11 +283,11 @@ export const CameraPreview = ({
     ctx.drawImage(video, 0, 0, width, height);
     ctx.filter = "none";
     const dataUrl = canvas.toDataURL("image/png", 1);
-    onCaptured({ dataUrl, width, height, filterId: selectedFilterId });
-    onStatusChange("Captured. You can retake any slot.");
+    onCapturedRef.current({ dataUrl, width, height, filterId: selectedFilterId });
+    onStatusChangeRef.current("Captured. You can retake any slot.");
     setIsCapturing(false);
     setCountdownRemaining(null);
-  }, [facingMode, mirrorPreview, onCaptured, onStatusChange, selectedFilterId]);
+  }, [facingMode, mirrorPreview, selectedFilterId]);
 
   const handleCapture = useCallback(() => {
     if (isCapturing) {
@@ -309,13 +314,13 @@ export const CameraPreview = ({
       return;
     }
 
-    onStatusChange(`Capturing in ${countdownRemaining}...`);
+    onStatusChangeRef.current(`Capturing in ${countdownRemaining}...`);
     const timer = window.setTimeout(() => {
       setCountdownRemaining((prev) => (prev === null ? prev : prev - 1));
     }, 1000);
 
     return () => window.clearTimeout(timer);
-  }, [captureFrame, countdownRemaining, onStatusChange]);
+  }, [captureFrame, countdownRemaining]);
 
   const handleFlip = useCallback(() => {
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
@@ -325,25 +330,25 @@ export const CameraPreview = ({
     if (countdownRemaining !== null) {
       setCountdownRemaining(null);
       setIsCapturing(false);
-      onStatusChange("Countdown cancelled.");
+      onStatusChangeRef.current("Countdown cancelled.");
     }
-  }, [countdownRemaining, onStatusChange]);
+  }, [countdownRemaining]);
 
   const handleGalleryUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      onStatusChange("Loading image...");
+      onStatusChangeRef.current("Loading image...");
       const result = await readFileAsDataUrl(file);
-      onCaptured({ dataUrl: result.dataUrl, width: result.width, height: result.height, filterId: "none" });
-      onStatusChange("Image loaded. Review and confirm.");
+      onCapturedRef.current({ dataUrl: result.dataUrl, width: result.width, height: result.height, filterId: "none" });
+      onStatusChangeRef.current("Image loaded. Review and confirm.");
     } catch {
-      onStatusChange("Failed to load image. Try another file.");
+      onStatusChangeRef.current("Failed to load image. Try another file.");
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [onCaptured, onStatusChange]);
+  }, []);
 
   const isLive = cameraState === "live";
   const isDenied = cameraState === "denied";
